@@ -28,6 +28,9 @@
   .hint{font-size:12px;color:var(--dim);margin-top:6px}
   button{width:100%;margin-top:14px;font-size:16px;font-weight:800;padding:15px;border:none;border-radius:12px;background:var(--green);color:var(--greenink);cursor:pointer}
   button:disabled{opacity:.5}
+  .seg{display:flex;gap:10px}
+  .gbtn{flex:1;width:auto;margin:0;font-size:15px;font-weight:700;padding:13px;border-radius:11px;border:1px solid #2f2645;background:var(--panel2);color:var(--muted);cursor:pointer}
+  .gbtn.active{background:var(--green);color:var(--greenink);border-color:var(--green)}
   .msg{padding:12px 14px;border-radius:11px;margin-bottom:14px;font-size:14px;display:none}
   .msg.ok{display:block;background:#05301f;border:1px solid var(--green);color:#b9f5d8}
   .msg.err{display:block;background:#3a0f1c;border:1px solid var(--pink);color:#ffc4da}
@@ -56,7 +59,16 @@
     <div class="msg" id="msg"></div>
 
     <div id="content" style="display:none">
-      <h2>1 · Your goals</h2>
+      <h2>1 · You are</h2>
+      <div class="card">
+        <div class="seg">
+          <button type="button" class="gbtn" data-g="M" id="gM">♂ Male</button>
+          <button type="button" class="gbtn" data-g="F" id="gF">♀ Female</button>
+        </div>
+        <div class="hint">So the coach roasts you with the right vibe. 💅</div>
+      </div>
+
+      <h2>2 · Your goals</h2>
       <div class="card"><div class="row">
         <div><label>Daily calories</label><input id="calorie_goal" type="number" inputmode="numeric" placeholder="2300"></div>
         <div><label>Daily protein (g)</label><input id="protein_goal" type="number" inputmode="numeric" placeholder="180"></div>
@@ -67,14 +79,14 @@
       </div></div>
       <div class="hint" style="margin:-2px 2px 4px;line-height:1.55">💡 Set goals that are <b>realistic and attainable</b> — what you can actually hit <b>every week</b>, not your dream/ideal number. Aim for "required," not "perfect." You can raise them later.</div>
 
-      <h2>2 · Your number</h2>
+      <h2>3 · Your number</h2>
       <div class="card">
         <label>WhatsApp number (with country code)</label>
         <input id="whatsapp" type="tel" inputmode="tel" placeholder="1 555 123 4567">
         <div class="hint">So the coach can roast you and add you to the group. 💀</div>
       </div>
 
-      <h2>3 · When you eat</h2>
+      <h2>4 · When you eat</h2>
       <div class="card">
         <div id="bfast_wrap" style="margin-bottom:12px"><label>Breakfast</label><input id="breakfast_time" type="time"></div>
         <div style="margin-bottom:12px"><label>Lunch</label><input id="lunch_time" type="time"></div>
@@ -85,7 +97,7 @@
 
       <button id="save">Save my info</button>
 
-      <h2>4 · Connect your health</h2>
+      <h2>5 · Connect your health</h2>
       <div class="card">
         <p style="color:var(--muted);font-size:14px;margin:0 0 4px;line-height:1.55">This is the only techy part — I'll hold your hand through <b>every single tap</b>. Do it once and never touch it again. 🫶 <b>iPhone only.</b></p>
 
@@ -126,6 +138,11 @@
   const $ = (id) => document.getElementById(id);
   const show = (cls, text) => { const m = $("msg"); m.className = "msg " + cls; m.textContent = text; };
 
+  let gender = "";
+  function setGender(g) { gender = g; $("gM").classList.toggle("active", g === "M"); $("gF").classList.toggle("active", g === "F"); }
+  $("gM").addEventListener("click", () => setGender("M"));
+  $("gF").addEventListener("click", () => setGender("F"));
+
   async function load() {
     if (!token) { $("hi").textContent = "Missing your link"; $("whoami").textContent = "Ask Medi for your personal setup link."; return; }
     try {
@@ -134,6 +151,7 @@
       if (!d.ok) throw new Error(d.error || "could not load");
       $("hi").textContent = "Hey " + d.display_name + " 👋";
       $("whoami").textContent = "Let's get you into " + d.pod_name + " — takes 2 minutes.";
+      if (d.gender) setGender(d.gender);
       $("calorie_goal").value = d.calorie_goal ?? "";
       $("protein_goal").value = d.protein_goal ?? "";
       $("gym_goal").value = d.gym_goal ?? "";
@@ -154,6 +172,7 @@
   $("save").addEventListener("click", async () => {
     const skip = $("skip_breakfast").checked;
     const req = {
+      "gender (M/F)": gender,
       "daily calories": $("calorie_goal").value, "daily protein": $("protein_goal").value,
       "gym / week": $("gym_goal").value, "steps / day": $("steps_goal").value,
       "WhatsApp number": $("whatsapp").value,
@@ -165,7 +184,7 @@
 
     $("save").disabled = true; show("", "");
     try {
-      const body = { u: token,
+      const body = { u: token, gender: gender,
         calorie_goal: $("calorie_goal").value, protein_goal: $("protein_goal").value,
         gym_goal: $("gym_goal").value, steps_goal: $("steps_goal").value,
         whatsapp: $("whatsapp").value,
