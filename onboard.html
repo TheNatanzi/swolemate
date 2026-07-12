@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SwoleMate · get set up</title>
+<style>
+  :root{
+    --bg:#0b0910; --panel:#15111d; --panel2:#1d1729; --line:#2b2340;
+    --ink:#f4eefb; --muted:#a595bd; --dim:#6f6388;
+    --green:#00d68f; --greenink:#04160f; --pink:#ff2e88; --gold:#f0b429;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+    background-image:radial-gradient(700px 340px at 85% -8%, rgba(255,46,136,.15), transparent 60%),radial-gradient(600px 340px at 0% 0%, rgba(0,214,143,.10), transparent 55%);}
+  .wrap{max-width:480px;margin:0 auto;padding:28px 18px 70px}
+  .brand{font-weight:900;letter-spacing:-.02em;font-size:15px;text-transform:uppercase}
+  .brand .p{color:var(--pink)} .brand .g{color:var(--green)}
+  h1{font-size:26px;font-weight:800;letter-spacing:-.02em;margin:14px 0 2px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 22px}
+  h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:26px 0 10px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+  label{display:block;font-size:13px;color:var(--muted);margin:2px 0 7px;font-weight:600}
+  input{width:100%;font-size:17px;padding:12px 14px;border-radius:11px;border:1px solid #2f2645;background:var(--panel2);color:var(--ink)}
+  input:focus{outline:none;border-color:var(--green)}
+  .row{display:flex;gap:12px}.row>div{flex:1}
+  .hint{font-size:12px;color:var(--dim);margin-top:6px}
+  button{width:100%;margin-top:14px;font-size:16px;font-weight:800;padding:15px;border:none;border-radius:12px;background:var(--green);color:var(--greenink);cursor:pointer}
+  button:disabled{opacity:.5}
+  .msg{padding:12px 14px;border-radius:11px;margin-bottom:14px;font-size:14px;display:none}
+  .msg.ok{display:block;background:#05301f;border:1px solid var(--green);color:#b9f5d8}
+  .msg.err{display:block;background:#3a0f1c;border:1px solid var(--pink);color:#ffc4da}
+  .chore{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+  .chore:last-child{border-bottom:none}
+  .chore .n{flex:0 0 26px;height:26px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:var(--gold)}
+  .chore .t{font-weight:700;font-size:15px}
+  .chore .d{color:var(--muted);font-size:13.5px;margin-top:3px}
+  .chore .d b{color:var(--ink)}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand"><span class="p">Swole</span><span class="g">Mate</span> 💅🏋️</div>
+    <h1 id="hi">Loading…</h1>
+    <p class="sub" id="whoami">getting your setup ready</p>
+
+    <div class="msg" id="msg"></div>
+
+    <div id="content" style="display:none">
+      <h2>1 · Your goals</h2>
+      <div class="card"><div class="row">
+        <div><label>Daily calories</label><input id="calorie_goal" type="number" inputmode="numeric" placeholder="2300"></div>
+        <div><label>Daily protein (g)</label><input id="protein_goal" type="number" inputmode="numeric" placeholder="180"></div>
+      </div></div>
+      <div class="card"><div class="row">
+        <div><label>Gym / week</label><input id="gym_goal" type="number" inputmode="numeric" placeholder="3"></div>
+        <div><label>Steps / day</label><input id="steps_goal" type="number" inputmode="numeric" placeholder="8000"></div>
+      </div></div>
+
+      <h2>2 · Your number</h2>
+      <div class="card">
+        <label>WhatsApp number (with country code)</label>
+        <input id="whatsapp" type="tel" inputmode="tel" placeholder="1 555 123 4567">
+        <div class="hint">So the coach can roast you and add you to the group. 💀</div>
+      </div>
+
+      <h2>3 · When you eat</h2>
+      <div class="card">
+        <div class="row">
+          <div><label>Breakfast</label><input id="breakfast_time" type="time"></div>
+          <div><label>Lunch</label><input id="lunch_time" type="time"></div>
+          <div><label>Dinner</label><input id="dinner_time" type="time"></div>
+        </div>
+        <label style="margin-top:14px;display:flex;align-items:center;gap:8px;color:var(--ink)"><input type="checkbox" id="skip_breakfast" style="width:auto">I skip breakfast (don't nag me about it)</label>
+        <div class="hint">If a meal's still unlogged a while after its time, the coach sends a sassy nudge. 💀</div>
+      </div>
+
+      <button id="save">Save my info</button>
+
+      <h2>4 · Connect your health (2 min)</h2>
+      <div class="card">
+        <div class="chore"><div class="n">A</div><div>
+          <div class="t">🔥 Turn on Cronometer → Apple Health</div>
+          <div class="d">Cronometer → <b>Settings → Apple Health</b> → under <b>Export to Apple Health</b> turn ON <b>Calories</b> + <b>Protein</b>. Sends your food to the coach — <b>no password, ever.</b></div>
+        </div></div>
+        <div class="chore"><div class="n">B</div><div>
+          <div class="t">👟 Add the steps Shortcut</div>
+          <div class="d">Tap the <b>Shortcut link Medi texts you</b> → <b>Add Shortcut</b>, then set a daily time (Shortcuts app → Automation). Grabs your steps + food and sends them in each day.</div>
+        </div></div>
+        <div class="chore"><div class="n">C</div><div>
+          <div class="t">📸 Send Medi a selfie</div>
+          <div class="d">Text a clear front-facing photo to <b>Medi</b> — that's what your cartoon avatar gets built from. 🎨</div>
+        </div></div>
+      </div>
+      <p class="hint" style="text-align:center;margin-top:16px">That's it. The coach takes it from here. 🫡</p>
+    </div>
+  </div>
+
+<script>
+  const API = "https://lxuvaggznyvgqxknlnvp.supabase.co/functions/v1/onboard";
+  const params = new URLSearchParams(location.search);
+  const token = params.get("u") || params.get("t") || "";
+  const $ = (id) => document.getElementById(id);
+  const show = (cls, text) => { const m = $("msg"); m.className = "msg " + cls; m.textContent = text; };
+
+  async function load() {
+    if (!token) { $("hi").textContent = "Missing your link"; $("whoami").textContent = "Ask Medi for your personal setup link."; return; }
+    try {
+      const r = await fetch(API + "?u=" + encodeURIComponent(token) + "&api=1");
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "could not load");
+      $("hi").textContent = "Hey " + d.display_name + " 👋";
+      $("whoami").textContent = "Let's get you into " + d.pod_name + " — takes 2 minutes.";
+      $("calorie_goal").value = d.calorie_goal ?? "";
+      $("protein_goal").value = d.protein_goal ?? "";
+      $("gym_goal").value = d.gym_goal ?? "";
+      $("steps_goal").value = d.steps_goal ?? "";
+      $("whatsapp").value = d.whatsapp_to ?? "";
+      $("breakfast_time").value = d.breakfast_time ?? "";
+      $("lunch_time").value = d.lunch_time ?? "";
+      $("dinner_time").value = d.dinner_time ?? "";
+      $("skip_breakfast").checked = !!d.skip_breakfast;
+      $("content").style.display = "block";
+    } catch (e) { $("hi").textContent = "Hmm."; $("whoami").textContent = ""; show("err", String(e.message || e)); }
+  }
+
+  $("save").addEventListener("click", async () => {
+    $("save").disabled = true; show("", "");
+    try {
+      const body = { u: token,
+        calorie_goal: $("calorie_goal").value, protein_goal: $("protein_goal").value,
+        gym_goal: $("gym_goal").value, steps_goal: $("steps_goal").value,
+        whatsapp: $("whatsapp").value,
+        breakfast_time: $("breakfast_time").value, lunch_time: $("lunch_time").value,
+        dinner_time: $("dinner_time").value, skip_breakfast: $("skip_breakfast").checked };
+      const r = await fetch(API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "save failed");
+      show("ok", "Saved 💾 Now finish the 3 health steps below and you're in.");
+    } catch (e) { show("err", "Couldn't save: " + String(e.message || e)); }
+    finally { $("save").disabled = false; }
+  });
+
+  load();
+</script>
+</body>
+</html>
