@@ -1,0 +1,406 @@
+<title>SwoleMate — the pitch</title>
+<style>
+  :root{
+    --bg:#0b0910; --bg2:#0f0b16; --panel:#15111d; --panel2:#1c1628; --line:#2b2340;
+    --ink:#f6f0fc; --muted:#a998c1; --dim:#6c6088;
+    --pink:#ff2e88; --green:#00d68f; --gold:#f5b933; --blue:#4d9bff;
+    --greenink:#04160f;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --mono:ui-monospace,"SF Mono","Cascadia Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.5;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 22px}
+
+  /* section scaffold */
+  section{padding:78px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+  .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--pink);font-weight:600;margin-bottom:16px}
+  .eyebrow.g{color:var(--green)} .eyebrow.gd{color:var(--gold)}
+  h2{font-size:clamp(28px,5vw,46px);font-weight:900;letter-spacing:-.03em;line-height:1.04;
+    text-wrap:balance;margin-bottom:14px}
+  .lede{font-size:clamp(16px,2.4vw,20px);color:var(--muted);max-width:640px;text-wrap:pretty}
+
+  /* reveal */
+  .rise{opacity:0;transform:translateY(22px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .rise.in{opacity:1;transform:none}
+
+  /* HERO */
+  .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;position:relative;
+    background:
+      radial-gradient(760px 420px at 82% 8%, rgba(255,46,136,.20), transparent 62%),
+      radial-gradient(680px 460px at 6% 92%, rgba(0,214,143,.14), transparent 58%);
+    border-bottom:none}
+  .mark{font-family:var(--mono);font-size:13px;letter-spacing:.28em;text-transform:uppercase;color:var(--muted);margin-bottom:26px}
+  .mark b{color:var(--ink)}
+  .hero h1{font-size:clamp(52px,12vw,124px);font-weight:900;letter-spacing:-.045em;line-height:.9}
+  .hero h1 .p{color:var(--pink)} .hero h1 .g{color:var(--green)}
+  .hero .tag{margin-top:22px;font-size:clamp(18px,3vw,27px);font-weight:700;color:var(--ink);max-width:720px;text-wrap:balance;letter-spacing:-.01em}
+  .hero .tag em{font-style:normal;color:var(--gold)}
+  .hero .sub{margin-top:16px;color:var(--muted);font-size:clamp(15px,2vw,18px);max-width:560px}
+  .chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:30px}
+  .chip{font-family:var(--mono);font-size:12px;letter-spacing:.04em;padding:8px 13px;border-radius:999px;
+    border:1px solid var(--line);background:rgba(255,255,255,.02);color:var(--muted)}
+  .chip b{color:var(--ink);font-weight:600}
+  .scrollcue{position:absolute;left:22px;bottom:26px;font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase}
+
+  /* generic grid cards */
+  .grid{display:grid;gap:16px;margin-top:34px}
+  .g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:repeat(2,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px}
+  .card .ic{font-size:26px;margin-bottom:12px}
+  .card h3{font-size:17px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px}
+  .card p{font-size:14.5px;color:var(--muted);line-height:1.55}
+  .card .num{font-family:var(--mono);font-size:12px;color:var(--pink);letter-spacing:.1em}
+
+  /* problem->fix split */
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:34px}
+  .bad,.good{border-radius:18px;padding:24px;border:1px solid var(--line)}
+  .bad{background:linear-gradient(180deg,rgba(255,46,136,.07),transparent)}
+  .good{background:linear-gradient(180deg,rgba(0,214,143,.08),transparent)}
+  .bad h3,.good h3{font-size:13px;font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;margin-bottom:14px}
+  .bad h3{color:var(--pink)} .good h3{color:var(--green)}
+  .rowli{display:flex;gap:11px;padding:9px 0;font-size:15px;color:var(--muted);align-items:flex-start}
+  .rowli .b{flex:0 0 18px;color:var(--ink);font-weight:800}
+  .good .rowli .b{color:var(--green)}
+
+  /* pipes */
+  .flow{display:flex;flex-direction:column;align-items:center;gap:13px;margin-top:34px}
+  .srclabel{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);margin-bottom:2px}
+  .sources{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;width:100%}
+  .node{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;text-align:center}
+  .node .t{font-weight:800;font-size:15px} .node .s{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .node .e{font-size:27px;margin-bottom:8px;line-height:1}
+  .down{color:var(--pink);font-size:24px;font-weight:800;line-height:.8}
+  .node.server{border-color:rgba(0,214,143,.4);box-shadow:0 0 0 1px rgba(0,214,143,.15),0 8px 34px rgba(0,214,143,.10);max-width:360px;width:100%}
+  .node.wa{border-color:rgba(77,155,255,.45);max-width:360px;width:100%}
+  .safe{margin-top:22px;text-align:center;font-size:13.5px;color:var(--muted);line-height:1.6;max-width:640px;margin-left:auto;margin-right:auto}
+  .safe b{color:var(--green)}
+
+  /* season / glory */
+  .glory{margin-top:30px;background:
+      radial-gradient(500px 200px at 50% 0%, rgba(245,185,51,.16), transparent 70%),
+      linear-gradient(180deg,rgba(245,185,51,.06),transparent);
+    border:1px solid rgba(245,185,51,.32);border-radius:22px;padding:30px 24px;text-align:center}
+  .weeks{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:22px 0 8px}
+  .wk{min-width:96px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 14px}
+  .wk .n{font-family:var(--mono);font-size:30px;font-weight:700;letter-spacing:-.02em}
+  .wk .u{font-size:11px;color:var(--muted);font-family:var(--mono);letter-spacing:.12em;text-transform:uppercase;margin-top:2px}
+  .wk .k{font-size:11.5px;color:var(--dim);margin-top:8px}
+  .wk.pick{border-color:var(--gold);background:linear-gradient(180deg,rgba(245,185,51,.14),transparent)}
+  .wk.pick .n{color:var(--gold)}
+  .wk.pick .u{color:var(--gold)}
+  .gloryline{font-family:var(--mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);margin-top:14px}
+
+  /* phone mockup */
+  .phoneStage{display:grid;grid-template-columns:1fr 1fr;gap:34px;align-items:center;margin-top:34px}
+  .phone{width:100%;max-width:340px;margin:0 auto;background:#0a0f0d;border:9px solid #1b1622;border-radius:38px;
+    padding:12px 10px 16px;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+  .wabar{display:flex;align-items:center;gap:10px;padding:6px 8px 12px;border-bottom:1px solid rgba(255,255,255,.06)}
+  .waAv{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--pink),var(--gold));display:flex;align-items:center;justify-content:center;font-size:17px}
+  .waName{font-weight:700;font-size:14px} .waStat{font-size:11px;color:var(--green)}
+  .thread{padding:12px 6px 2px;background:
+    linear-gradient(180deg,#0a0f0d,#0a0f0d)}
+  .bubble{background:#1f2c26;border-radius:14px;border-top-left-radius:4px;padding:11px 13px;margin:9px 4px;
+    font-size:13.5px;line-height:1.5;white-space:pre-wrap;box-shadow:0 1px 0 rgba(0,0,0,.3)}
+  .bubble .hd{font-weight:800;color:var(--gold)}
+  .bubble b{font-weight:800;color:#fff}
+  .bubble .rz{color:#8fe9c8;font-style:italic}
+  .bubble .time{display:block;text-align:right;font-size:10px;color:#5f7a70;margin-top:5px}
+  .mockcap{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px}
+
+  /* pillars */
+  .pills{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-top:34px}
+  .pill{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px 14px;text-align:center}
+  .pill .e{font-size:28px} .pill .n{font-weight:800;margin-top:8px;font-size:15px}
+  .pill .d{font-size:12.5px;color:var(--muted);margin-top:4px}
+  .pill .tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-top:9px;color:var(--pink);text-transform:uppercase}
+  .pill .tag.w{color:var(--gold)}
+
+  /* league medals */
+  .medals{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:26px}
+  .medal{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;text-align:center}
+  .medal .m{font-size:30px} .medal .p{font-family:var(--mono);font-size:22px;font-weight:700;margin-top:6px}
+  .medal .l{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .medal.g{border-color:rgba(245,185,51,.5)}
+
+  /* avatar ramp */
+  .ramp{display:grid;grid-template-columns:repeat(10,1fr);gap:8px;margin-top:30px}
+  .av{aspect-ratio:1;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:clamp(18px,3.4vw,30px);
+    border:1px solid var(--line);position:relative;image-rendering:pixelated}
+  .av .lv{position:absolute;bottom:4px;right:6px;font-family:var(--mono);font-size:9px;color:rgba(255,255,255,.6)}
+  .rampcap{display:flex;justify-content:space-between;margin-top:10px;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.08em;text-transform:uppercase}
+
+  /* squad */
+  .squad{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:32px}
+  .mate{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:20px;text-align:center}
+  .mate .face{width:62px;height:62px;border-radius:50%;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;font-size:28px;
+    background:var(--panel2);border:1px solid var(--line)}
+  .mate .nm{font-weight:800;font-size:16px} .mate .rl{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .mate .src{font-family:var(--mono);font-size:10.5px;color:var(--green);margin-top:10px;letter-spacing:.05em}
+
+  /* roadmap */
+  .road{margin-top:30px;display:grid;gap:10px}
+  .step{display:flex;gap:14px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 17px}
+  .step .st{font-family:var(--mono);font-size:11px;padding:5px 10px;border-radius:999px;font-weight:700;letter-spacing:.06em;white-space:nowrap;margin-top:1px}
+  .st.done{background:rgba(0,214,143,.15);color:var(--green);border:1px solid rgba(0,214,143,.3)}
+  .st.now{background:rgba(245,185,51,.15);color:var(--gold);border:1px solid rgba(245,185,51,.35)}
+  .st.next{background:rgba(255,255,255,.05);color:var(--muted);border:1px solid var(--line)}
+  .step .tx{font-size:14.5px} .step .tx b{font-weight:800}
+  .step .tx span{color:var(--muted);display:block;font-size:13px;margin-top:2px}
+
+  .foot{padding:60px 0 90px;text-align:center}
+  .foot .big{font-size:clamp(26px,5vw,44px);font-weight:900;letter-spacing:-.03em}
+  .foot .big .g{color:var(--green)} .foot .big .p{color:var(--pink)}
+  .foot .sm{color:var(--muted);margin-top:12px;font-size:15px}
+
+  @media(max-width:760px){
+    .g3,.g4,.pills,.medals,.squad{grid-template-columns:repeat(2,1fr)}
+    .split,.phoneStage{grid-template-columns:1fr}
+    .ramp{grid-template-columns:repeat(5,1fr)}
+    section{padding:56px 0}
+  }
+</style>
+
+<section class="hero">
+  <div class="wrap">
+    <div class="mark rise">a fitness experiment by <b>Medi</b> · for the squad of 4</div>
+    <h1 class="rise"><span class="p">Swole</span><span class="g">Mate</span> 💅🏋️</h1>
+    <div class="tag rise">The group chat coach that <em>roasts you into shape</em> — and lives entirely inside WhatsApp.</div>
+    <div class="sub rise">No app to download. No dashboard nobody opens. Just one savage little coach that reads your real numbers every day and drags you (lovingly) in front of your friends.</div>
+    <div class="chips rise">
+      <div class="chip"><b>4</b> friends</div>
+      <div class="chip"><b>5</b> pillars tracked</div>
+      <div class="chip"><b>0</b> passwords shared</div>
+      <div class="chip"><b>$0</b> to run</div>
+      <div class="chip">runs while your <b>phone's off</b></div>
+    </div>
+  </div>
+  <div class="scrollcue">scroll ↓</div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow rise">the problem</div>
+    <h2 class="rise">Every group fitness pact dies the same way.</h2>
+    <p class="lede rise">Everyone's hyped for 4 days. Then the texts stop, nobody wants to be the nag, and the spreadsheet no one opened gathers dust. Accountability needs a villain who never gets tired. So we built one.</p>
+    <div class="split">
+      <div class="bad rise">
+        <h3>💀 the usual</h3>
+        <div class="rowli"><span class="b">✕</span>"how'd everyone do this week?" … silence</div>
+        <div class="rowli"><span class="b">✕</span>one friend becomes the annoying reminder guy</div>
+        <div class="rowli"><span class="b">✕</span>a dashboard/app you open twice then never again</div>
+        <div class="rowli"><span class="b">✕</span>no stakes, no teeth, no fun</div>
+      </div>
+      <div class="good rise">
+        <h3>🔥 swolemate</h3>
+        <div class="rowli"><span class="b">✓</span>coach posts the scoreboard <b>for you</b>, every day</div>
+        <div class="rowli"><span class="b">✓</span>the "nag" is a bot — no friendship tax</div>
+        <div class="rowli"><span class="b">✓</span>it comes to WhatsApp, where you already are</div>
+        <div class="rowli"><span class="b">✓</span>medals, streaks, roasts + a running season</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow g rise">how it works</div>
+    <h2 class="rise">Your real data flows in. No passwords. Ever.</h2>
+    <p class="lede rise">The coach reads what you already track — then a server (not your phone) does all the work and posts to the group.</p>
+    <div class="flow rise">
+      <div class="srclabel">what you already track</div>
+      <div class="sources">
+        <div class="node"><div class="e">🥗</div><div class="t">Cronometer</div><div class="s">calories · protein</div></div>
+        <div class="node"><div class="e">💍</div><div class="t">Oura ring</div><div class="s">steps · workouts</div></div>
+        <div class="node"><div class="e">🍎</div><div class="t">Apple Health</div><div class="s">steps · no ring needed</div></div>
+      </div>
+      <div class="down">↓</div>
+      <div class="node server"><div class="e">🤖</div><div class="t">SwoleMate server</div><div class="s">grades · roasts · scores · medals</div></div>
+      <div class="down">↓</div>
+      <div class="node wa"><div class="e">💬</div><div class="t">WhatsApp group</div><div class="s">everyone sees it, every day</div></div>
+    </div>
+    <div class="safe rise">🔒 You log food in <b>Cronometer</b> like normal — it quietly exports calories + protein into Apple Health, so friends never hand over a password. Steps come from the phone or the ring.</div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow gd rise">the daily read</div>
+    <h2 class="rise">One post. All four of you. Yesterday, laid bare.</h2>
+    <p class="lede rise">Every morning at 10, the coach drops the group scoreboard — real numbers, a ✅/❌ per pillar, an "aura" score, and one custom roast each.</p>
+    <div class="phoneStage">
+      <div class="rise">
+        <div class="mockcap">☀️ 10:00 am · the group thread</div>
+        <div class="phone">
+          <div class="wabar"><div class="waAv">💅</div><div><div class="waName">SwoleMate</div><div class="waStat">online · unhinged</div></div></div>
+          <div class="thread">
+            <div class="bubble"><span class="hd">☀️ THE DAILY READ · yesterday</span>
+
+<b>Medi</b> ✨303
+📝✅ 🥩211g✅ 🍽️2,192✅ 👟4.2k❌ · 🏋️1/3
+<span class="rz">main-character energy, background-extra effort. we LOVE potential. 🎬</span>
+
+<b>Teyaum</b> ✨255
+📝✅ 🥩180g✅ 🍽️2,410✅ 👟9.1k✅ · 🏋️2/4
+<span class="rz">mother served. everyone else take notes. 📝🔥</span>
+
+<b>Gizem</b> ✨90
+📝✅ 🥩70g❌ 🍽️1,150❌ 👟3.0k❌ · 🏋️0/3
+<span class="rz">did you eat a single crumb? EAT. this isn't a hunger games audition 💀</span>
+            <span class="time">10:00 AM</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="rise">
+        <div class="grid g2" style="margin-top:0">
+          <div class="card"><div class="ic">📝</div><div class="num">DAILY</div><h3>The ✅/❌ line</h3><p>Log · protein · calories · steps, each with the real number and a hit/miss.</p></div>
+          <div class="card"><div class="ic">✨</div><div class="num">AURA</div><h3>The aura score</h3><p>A single 0–400 number that ranks the group top-to-bottom. Bragging rights, quantified.</p></div>
+          <div class="card"><div class="ic">🏋️</div><div class="num">WEEKLY</div><h3>Gym is a week goal</h3><p>Shown as <b>1/3</b> — no daily shaming for a rest day, a ✅ only when you hit the week.</p></div>
+          <div class="card"><div class="ic">🔥</div><div class="num">100+ LINES</div><h3>Never the same roast</h3><p>A rotating library so the coach stays fresh, savage, and a little feral.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow rise">the game</div>
+    <h2 class="rise">Five pillars. One score. Zero mercy.</h2>
+    <p class="lede rise">Each pillar is scored against <b>your own</b> goals — so the slow friend and the beast friend compete fairly.</p>
+    <div class="pills">
+      <div class="pill rise"><div class="e">📝</div><div class="n">Log</div><div class="d">Did you track your food?</div><div class="tag">daily streak</div></div>
+      <div class="pill rise"><div class="e">🥩</div><div class="n">Protein</div><div class="d">Hit your gram goal</div><div class="tag w">weekly</div></div>
+      <div class="pill rise"><div class="e">🍽️</div><div class="n">Calories</div><div class="d">Land in your band</div><div class="tag w">weekly</div></div>
+      <div class="pill rise"><div class="e">👟</div><div class="n">Steps</div><div class="d">Move your body</div><div class="tag w">weekly</div></div>
+      <div class="pill rise"><div class="e">🏋️</div><div class="n">Gym</div><div class="d">Sessions per week</div><div class="tag w">weekly</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow gd rise">the league</div>
+    <h2 class="rise">Every Monday, the coach crowns and buries you.</h2>
+    <p class="lede rise">Your week becomes a score out of 5. Rank the squad → hand out medals → medals bank into a running season (8 weeks, fully adjustable).</p>
+    <div class="medals">
+      <div class="medal g rise"><div class="m">🥇</div><div class="p">3</div><div class="l">Gold · Mother of the Week</div></div>
+      <div class="medal rise"><div class="m">🥈</div><div class="p">2</div><div class="l">Silver</div></div>
+      <div class="medal rise"><div class="m">🥉</div><div class="p">1</div><div class="l">Bronze</div></div>
+      <div class="medal rise"><div class="m">💩</div><div class="p">0</div><div class="l">Last · crickets 🦗</div></div>
+    </div>
+    <div class="phoneStage" style="margin-top:30px">
+      <div class="rise">
+        <div class="mockcap">🏁 monday · message 1 of 2</div>
+        <div class="phone"><div class="thread" style="padding-top:4px">
+          <div class="bubble"><span class="hd">🏁 LAST WEEK'S RESULTS · avg/day</span>
+
+🥇 <b>Teyaum</b> 5/5 — 👑 Mother of the Week
+🥩186g✅ 🍽️2,380✅ 👟10.1k✅ · 🏋️4/4✅ · 📝7/7✅
+
+🥈 <b>Medi</b> 3/5
+🥩205g✅ 🍽️2,240✅ 👟6.8k❌ · 🏋️2/3 · 📝7/7✅
+
+🥉 <b>Rinad</b> 2/5
+🥩140g❌ 🍽️2,600✅ 👟8.2k✅ · 🏋️1/3 · 📝5/7❌
+
+💩 <b>Gizem</b> 1/5 — crickets 🦗
+🥩80g❌ 🍽️1,300❌ 👟4.1k❌ · 🏋️0/3 · 📝6/7❌
+          <span class="time">Mon 12:00 PM</span></div>
+        </div></div>
+      </div>
+      <div class="rise">
+        <div class="mockcap">🏆 monday · message 2 of 2</div>
+        <div class="phone"><div class="thread" style="padding-top:4px">
+          <div class="bubble"><span class="hd">🏆 THE CHALLENGE · Week 3 of 8</span>
+
+1. <b>Teyaum</b> — 8 pts 🥇🥇🥈
+2. <b>Medi</b> — 6 pts 🥈🥇🥉
+3. <b>Rinad</b> — 3 pts 🥉🥉🥉
+4. <b>Gizem</b> — 1 pts 💩🥉💩
+          <span class="time">Mon 12:00 PM</span></div>
+        </div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow gd rise">your season</div>
+    <h2 class="rise">Choose your road to glory.</h2>
+    <p class="lede rise">You decide how long the war lasts. Every week banks medals into one running total — and when the final whistle blows, one of you is crowned champion for the whole season while the other three live with it. Reset and run it back whenever you want redemption.</p>
+    <div class="glory rise">
+      <div class="srclabel" style="color:var(--gold)">how long is the battle?</div>
+      <div class="weeks">
+        <div class="wk"><div class="n">4</div><div class="u">weeks</div><div class="k">a sprint</div></div>
+        <div class="wk"><div class="n">6</div><div class="u">weeks</div><div class="k">a grind</div></div>
+        <div class="wk pick"><div class="n">8</div><div class="u">weeks</div><div class="k">the classic ⭐</div></div>
+        <div class="wk"><div class="n">12</div><div class="u">weeks</div><div class="k">a saga</div></div>
+      </div>
+      <div class="gloryline">🏆 winner takes eternal bragging rights · losers take the L</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow g rise">the hook</div>
+    <h2 class="rise">Your face, as a pixel character that morphs with your effort.</h2>
+    <p class="lede rise">Everyone sends one selfie. We generate a 10-step avatar of <b>you</b> — a bloated food-goblin at the bottom, a blond super-saiyan at the top. Slack off and you literally watch yourself decay.</p>
+    <div class="ramp rise">
+      <div class="av" style="background:linear-gradient(180deg,#3a2018,#241a16)">🍔<span class="lv">1</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#3a2418,#241a16)">🍟<span class="lv">2</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#33241a,#221a15)">🥤<span class="lv">3</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#2a221c,#20181a)">😪<span class="lv">4</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#231d2c,#191622)">🧍<span class="lv">5</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#1d2331,#161b26)">💪<span class="lv">6</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#1a2b2a,#141f20)">🏋️<span class="lv">7</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#183028,#12211c)">🔥<span class="lv">8</span></div>
+      <div class="av" style="background:linear-gradient(180deg,#1c3524,#132417)">😤<span class="lv">9</span></div>
+      <div class="av" style="background:linear-gradient(135deg,#f5b933,#00d68f);color:#04160f">⚡<span class="lv" style="color:#04160f">10</span></div>
+    </div>
+    <div class="rampcap"><span>◄ sickly food-goblin</span><span>normal</span><span>super-saiyan ►</span></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow rise">the squad</div>
+    <h2 class="rise">Four friends. One pod. Nobody escapes.</h2>
+    <div class="squad">
+      <div class="mate rise"><div class="face">🧔🏻</div><div class="nm">Medi</div><div class="rl">the founder · Android</div><div class="src">Cronometer + Oura</div></div>
+      <div class="mate rise"><div class="face">🧑🏻</div><div class="nm">Teyaum</div><div class="rl">iPhone + Oura</div><div class="src">Cronometer + Oura</div></div>
+      <div class="mate rise"><div class="face">👩🏻</div><div class="nm">Gizem</div><div class="rl">iPhone · Oura down</div><div class="src">Cronometer + iPhone steps</div></div>
+      <div class="mate rise"><div class="face">🧑🏽</div><div class="nm">Rinad</div><div class="rl">iPhone + Oura</div><div class="src">Cronometer + Oura</div></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="eyebrow gd rise">where it stands</div>
+    <h2 class="rise">The engine is built and tested. Now we go live.</h2>
+    <div class="road">
+      <div class="step rise"><span class="st done">DONE</span><div class="tx"><b>The whole message engine</b><span>Daily read, week-so-far, Monday league recap + season standings — all live on the server and tested on Medi's phone.</span></div></div>
+      <div class="step rise"><span class="st done">DONE</span><div class="tx"><b>Real data pipes</b><span>Cronometer, Oura & Apple Health all flow in. Medi's real numbers are already scoring.</span></div></div>
+      <div class="step rise"><span class="st done">DONE</span><div class="tx"><b>Password-free onboarding page</b><span>One personal link per friend: goals, gender, WhatsApp #, meal times + a hand-held health setup.</span></div></div>
+      <div class="step rise"><span class="st now">NOW</span><div class="tx"><b>Spin up the real WhatsApp group</b><span>Register the dedicated number (needs Medi's one-time code) → coach posts to the shared thread.</span></div></div>
+      <div class="step rise"><span class="st next">NEXT</span><div class="tx"><b>Onboard the 3 friends + build their avatars</b><span>Send links, collect selfies, connect Gizem's steps via the Shortcut.</span></div></div>
+      <div class="step rise"><span class="st next">NEXT</span><div class="tx"><b>Meal-time nags + streak flames</b><span>"You skipped dinner 👀" nudges and per-pillar streak messages.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<div class="foot wrap">
+  <div class="big"><span class="p">Swole</span><span class="g">Mate</span> — get roasted. get ripped.</div>
+  <div class="sm">Built for the squad · runs on Supabase + WhatsApp · $0/mo to operate</div>
+</div>
+
+<script>
+  const io=new IntersectionObserver((es)=>{es.forEach((e,i)=>{if(e.isIntersecting){setTimeout(()=>e.target.classList.add('in'),Math.min(i*45,180));io.unobserve(e.target);}})},{threshold:.14,rootMargin:'0px 0px -8% 0px'});
+  document.querySelectorAll('.rise').forEach((el)=>io.observe(el));
+</script>
