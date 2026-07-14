@@ -73,10 +73,19 @@
         <div><label>Daily calories</label><input id="calorie_goal" type="number" inputmode="numeric" placeholder="2300"></div>
         <div><label>Daily protein (g)</label><input id="protein_goal" type="number" inputmode="numeric" placeholder="180"></div>
       </div></div>
-      <div class="card"><div class="row">
-        <div><label>Gym / week</label><input id="gym_goal" type="number" inputmode="numeric" placeholder="3"></div>
-        <div><label>Steps / day</label><input id="steps_goal" type="number" inputmode="numeric" placeholder="8000"></div>
-      </div></div>
+      <div class="card">
+        <label>How should we track your activity?</label>
+        <div class="seg" style="margin-bottom:6px">
+          <button type="button" class="gbtn" data-m="steps" id="mSteps">👟 Steps</button>
+          <button type="button" class="gbtn" data-m="cardio" id="mCardio">🏃 Cardio min</button>
+        </div>
+        <div class="hint" style="margin:0 2px 12px">No step counter on your phone? Pick <b>Cardio minutes</b> — treadmill, bike, rowing, stairs, elliptical etc. all count. 🏃</div>
+        <div class="row">
+          <div><label>Gym / week</label><input id="gym_goal" type="number" inputmode="numeric" placeholder="3"></div>
+          <div id="stepsWrap"><label>Steps / day</label><input id="steps_goal" type="number" inputmode="numeric" placeholder="8000"></div>
+          <div id="cardioWrap" style="display:none"><label>Cardio min / week</label><input id="cardio_goal" type="number" inputmode="numeric" placeholder="150"></div>
+        </div>
+      </div>
       <div class="hint" style="margin:-2px 2px 4px;line-height:1.55">💡 Set goals that are <b>realistic and attainable</b> — what you can actually hit <b>every week</b>, not your dream/ideal number. Aim for "required," not "perfect." You can raise them later.</div>
 
       <h2>3 · Your number</h2>
@@ -143,6 +152,17 @@
   $("gM").addEventListener("click", () => setGender("M"));
   $("gF").addEventListener("click", () => setGender("F"));
 
+  let metric = "steps";
+  function setMetric(m) {
+    metric = m;
+    $("mSteps").classList.toggle("active", m === "steps");
+    $("mCardio").classList.toggle("active", m === "cardio");
+    $("stepsWrap").style.display = m === "steps" ? "block" : "none";
+    $("cardioWrap").style.display = m === "cardio" ? "block" : "none";
+  }
+  $("mSteps").addEventListener("click", () => setMetric("steps"));
+  $("mCardio").addEventListener("click", () => setMetric("cardio"));
+
   async function load() {
     if (!token) { $("hi").textContent = "Missing your link"; $("whoami").textContent = "Ask Medi for your personal setup link."; return; }
     try {
@@ -152,10 +172,12 @@
       $("hi").textContent = "Hey " + d.display_name + " 👋";
       $("whoami").textContent = "Let's get you into " + d.pod_name + " — takes 2 minutes.";
       if (d.gender) setGender(d.gender);
+      setMetric(d.activity_metric === "cardio" ? "cardio" : "steps");
       $("calorie_goal").value = d.calorie_goal ?? "";
       $("protein_goal").value = d.protein_goal ?? "";
       $("gym_goal").value = d.gym_goal ?? "";
       $("steps_goal").value = d.steps_goal ?? "";
+      $("cardio_goal").value = d.cardio_goal ?? "";
       $("whatsapp").value = d.whatsapp_to ?? "";
       $("breakfast_time").value = d.breakfast_time ?? "";
       $("lunch_time").value = d.lunch_time ?? "";
@@ -174,19 +196,23 @@
     const req = {
       "gender (M/F)": gender,
       "daily calories": $("calorie_goal").value, "daily protein": $("protein_goal").value,
-      "gym / week": $("gym_goal").value, "steps / day": $("steps_goal").value,
+      "gym / week": $("gym_goal").value,
       "WhatsApp number": $("whatsapp").value,
       "lunch time": $("lunch_time").value, "dinner time": $("dinner_time").value,
     };
+    if (metric === "cardio") req["cardio minutes / week"] = $("cardio_goal").value;
+    else req["steps / day"] = $("steps_goal").value;
     if (!skip) req["breakfast time"] = $("breakfast_time").value;
     const missing = Object.keys(req).filter((k) => !String(req[k]).trim());
     if (missing.length) { show("err", "Please fill out: " + missing.join(", ") + "."); return; }
 
     $("save").disabled = true; show("", "");
     try {
-      const body = { u: token, gender: gender,
+      const body = { u: token, gender: gender, activity_metric: metric,
         calorie_goal: $("calorie_goal").value, protein_goal: $("protein_goal").value,
-        gym_goal: $("gym_goal").value, steps_goal: $("steps_goal").value,
+        gym_goal: $("gym_goal").value,
+        steps_goal: metric === "steps" ? $("steps_goal").value : "",
+        cardio_goal: metric === "cardio" ? $("cardio_goal").value : "",
         whatsapp: $("whatsapp").value,
         breakfast_time: skip ? "" : $("breakfast_time").value, lunch_time: $("lunch_time").value,
         dinner_time: $("dinner_time").value, skip_breakfast: skip };
