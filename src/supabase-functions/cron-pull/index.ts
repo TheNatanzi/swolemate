@@ -66,7 +66,7 @@ function laDate(offsetDays = 0) { const d = new Date(Date.now() + offsetDays * 8
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
-  const start = url.searchParams.get("start") ?? laDate(-1);
+  const start = url.searchParams.get("start") ?? laDate(-7); // 7-day fail-safe window: heals missed days + retro-edits (append-only, views take newest per day)
   const end = url.searchParams.get("end") ?? laDate(0);
   const dryRun = url.searchParams.get("dry") === "1";
   const sql = postgres(Deno.env.get("SUPABASE_DB_URL"), { prepare: false });
