@@ -63,10 +63,20 @@ function isCardio(name, group, minutes) {
 function parseCardio(csv) { const byDay = {}; for (const r of rows(csv)) { const day = r["Day"]; const name = r["Exercise"]; const group = r["Group"]; const minutes = parseFloat(r["Minutes"]) || 0; if (!day || !isCardio(name, group, minutes)) continue; (byDay[day] ??= { minutes: 0, names: [], raw: [] }); byDay[day].minutes += minutes; byDay[day].names.push(name); byDay[day].raw.push(r); } return byDay; }
 
 function laDate(offsetDays = 0) { const d = new Date(Date.now() + offsetDays * 86400000); return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(d); }
+const addDays = (s, n) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const laHour = () => parseInt(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour12: false, hour: "2-digit" }).format(new Date()), 10);
+// Default pull window = the CURRENT week (Mon..today): edits heal within the week, past weeks are frozen.
+// Grace: Monday before 12pm LA also re-pulls LAST week so Sunday-night logging lands before the noon recap.
+function weekWindowStart() {
+  const today = laDate(0);
+  const dow = new Date(today + "T12:00:00Z").getUTCDay(); // 1 = Monday
+  const thisMonday = addDays(today, -((dow + 6) % 7));
+  return (dow === 1 && laHour() < 12) ? addDays(thisMonday, -7) : thisMonday;
+}
 
 Deno.serve(async (req) => {
   const url = new URL(req.url);
-  const start = url.searchParams.get("start") ?? laDate(-7); // 7-day fail-safe window: heals missed days + retro-edits (append-only, views take newest per day)
+  const start = url.searchParams.get("start") ?? weekWindowStart();
   const end = url.searchParams.get("end") ?? laDate(0);
   const dryRun = url.searchParams.get("dry") === "1";
   const sql = postgres(Deno.env.get("SUPABASE_DB_URL"), { prepare: false });

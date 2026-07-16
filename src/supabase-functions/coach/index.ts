@@ -145,11 +145,29 @@ const MEAL_AM = [
   `diary's still empty and it's the afternoon — log your breakfast + lunch 👀`,
   `breakfast? lunch? hello?? your food log is a ghost town 👻`,
   `it's the afternoon and you've logged NOTHING. the fork won't lift itself 🍴`,
+  `half the day gone and the diary's blanker than your excuses 📓`,
+  `we KNOW you ate. the log says otherwise. one of you is lying 🤨`,
+  `your macros called — they're filing a missing person report 🚨`,
+  `no breakfast, no lunch?? either you're a monk or you're slacking. log it`,
+  `the diary is giving abandoned warehouse. haunted. LOG.`,
+  `photosynthesis isn't real for humans bestie — log what you actually ate ☀️`,
+  `two meals unaccounted for. this isn't a mystery novel, it's a food log 🔎`,
+  `mother checked the diary and GASPED. nothing?? at THIS hour??`,
+  `if it isn't logged it didn't happen — and neither did your progress 💅`,
 ];
 const MEAL_PM = [
   `day's looking light — did dinner get logged, or ghosted? 🍽️`,
   `calories suspiciously low for this hour. log that dinner 👀`,
   `either you're fasting or you forgot to log dinner. we're betting forgot 💀`,
+  `it's almost bedtime and the diary's still hungry. feed it your dinner 📓`,
+  `your log ends at lunch like a cliffhanger. we need the season finale 🍿`,
+  `dinner happened. we ALL know dinner happened. WRITE IT DOWN ✍️`,
+  `the numbers say you're starving. the vibes say you forgot to log 🤔`,
+  `logging dinner takes 45 seconds. getting roasted in here lasts forever 💅`,
+  `mother refuses to believe you ate air tonight. log the dinner, bestie`,
+  `last call 🔔 the day closes soon and your diary's half-finished`,
+  `that calorie count is giving "oops i forgot". fix it before midnight 🕛`,
+  `skipping the log ≠ skipping the calories. they still count. LOG.`,
 ];
 async function composeMealCheck(sql, phase) {
   const today = laDate(0);
