@@ -75,6 +75,67 @@ def deliver_text(text):
     log(f"sent text ({len(text)} chars): {text.splitlines()[0][:60]}")
     return True
 
+GIF_DIR = r"G:\Shared drives\Adibs Online\Anthropic\Fitness App\Avatars\generated"
+
+def build_composite(people, gifset, outname):
+    """people = [(display, key, lvl)]; hstack their 3-frame gifs + name/level label bar -> one gif."""
+    from PIL import Image, ImageDraw, ImageFont, ImageSequence
+    cols = []
+    for disp, key, lvl in people:
+        im = Image.open(os.path.join(GIF_DIR, f"{key}-{gifset}-L{lvl:02d}.gif"))
+        frames = [f.convert("RGB").copy() for f in ImageSequence.Iterator(im)][:3]
+        while len(frames) < 3: frames.append(frames[-1])
+        cols.append((disp, lvl, frames))
+    W, H, LBL = 440, 616, 74
+    try: font = ImageFont.truetype("arialbd.ttf", 40)
+    except Exception: font = ImageFont.load_default()
+    out_frames = []
+    for i in range(3):
+        canvas = Image.new("RGB", (W * len(cols), H + LBL), (13, 11, 18))
+        for j, (disp, lvl, frames) in enumerate(cols):
+            canvas.paste(frames[i].resize((W, H)), (j * W, 0))
+            d = ImageDraw.Draw(canvas)
+            label = f"{disp} · L{lvl}"
+            tw = d.textlength(label, font=font)
+            d.text((j * W + (W - tw) // 2, H + 14), label, fill=(245, 185, 51), font=font)
+        out_frames.append(canvas.convert("P", palette=Image.ADAPTIVE, colors=256))
+    out = os.path.join(os.path.dirname(os.path.abspath(__file__)), outname)
+    out_frames[0].save(out, save_all=True, append_images=out_frames[1:], duration=160, loop=0, disposal=2, optimize=True)
+    return out
+
+def parse_ladder_people(text):
+    out = []
+    for m in re.finditer(r"[\U0001F53A\U0001F53B▪] ?️? ?\*(\w+)\* — \*L(\d+)", text):
+        key = NAME2KEY.get(m.group(1).lower())
+        if key: out.append((m.group(1), key, int(m.group(2))))
+    return out
+
+def deliver_gif_file(local_path, caption=None):
+    """Push a fresh gif to the phone, register it, share w/ optional caption via EXTRA_TEXT (emoji-safe)."""
+    name = os.path.basename(local_path)
+    adb("push", local_path, f"/sdcard/Download/SwoleMate/{name}")
+    shell(f"am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Download/SwoleMate/{name}")
+    time.sleep(1.5)
+    mid = media_id(name)
+    if not mid: log(f"FAIL composite: {name} not scanned"); return False
+    extra = ""
+    if caption is not None:
+        tmp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_msg.txt")
+        io.open(tmp, "w", encoding="utf-8", newline="\n").write(caption)
+        adb("push", tmp, "/sdcard/swole_msg.txt")
+        extra = ' --es android.intent.extra.TEXT "$(cat /sdcard/swole_msg.txt)"'
+    shell(f"am start -a android.intent.action.SEND -t image/gif --eu android.intent.extra.STREAM content://media/external/images/media/{mid} --grant-read-uri-permission{extra} -p com.whatsapp")
+    time.sleep(3)
+    g = wait_find(GROUP_RE)
+    if not g: log(f"FAIL composite {name}: group not found"); home(); return False
+    tap(g); time.sleep(2)
+    s = wait_find(r'content-desc="Send"')
+    if not s: log(f"FAIL composite {name}: send not found"); home(); return False
+    tap(s); time.sleep(3.5)
+    home()
+    log(f"sent composite gif: {name} (caption: {bool(caption)})")
+    return True
+
 def media_id(display_name):
     _, out, _ = shell(f"content query --uri content://media/external/images/media --projection _id:_display_name --where \"_display_name='{display_name}'\"")
     m = re.search(r"_id=(\d+)", out)
@@ -124,25 +185,29 @@ def run(mode):
     if d.get("skipped"): log(f"{mode}: skipped ({d['skipped']})"); return
     msgs = d.get("messages", [])
     log(f"{mode}: {len(msgs)} messages from coach")
-    gifs = []
+    stamp = datetime.date.today().strftime("%Y%m%d")
+    texts = 0; images = 0
     for msg in msgs:
-        deliver_text(msg)
-        time.sleep(2)
-        if "THE LADDER" in msg:      gifs += movers_from_ladder(msg, "pixel")
-        if "THRONE ROOM" in msg:     gifs += movers_from_ladder(msg, "got")
+        # LADDER / THRONE become ONE image message: composite gif of everyone + the text as caption
+        gifset = "pixel" if "THE LADDER" in msg else ("got" if "THRONE ROOM" in msg else None)
+        if gifset:
+            people = parse_ladder_people(msg)
+            if people:
+                comp = build_composite(people, gifset, f"_ladder_{gifset}_{stamp}.gif")
+                if deliver_gif_file(comp, caption=msg): images += 1
+                else: deliver_text(msg); texts += 1
+                time.sleep(2); continue
         if "YOUR CHAMPION" in msg:
             c = champion_from(msg)
-            if c: gifs.insert(0, f"{c}-podium.gif")
-    if mode == "monday" and not any(g.endswith("podium.gif") for g in gifs):
-        # no finale this week: podium for the weekly gold medalist from results msg
-        for msg in msgs:
-            if "LAST WEEK'S RESULTS" in msg:
-                c = champion_from(msg)
-                if c: gifs.insert(0, f"{c}-podium.gif")
-    for g in dict.fromkeys(gifs):  # dedupe, keep order
-        deliver_gif(g)
+            if c and deliver_gif_file(os.path.join(GIF_DIR, f"{c}-podium.gif"), caption=msg):
+                images += 1; time.sleep(2); continue
+        if mode == "monday" and "LAST WEEK'S RESULTS" in msg:
+            c = champion_from(msg)
+            if c and deliver_gif_file(os.path.join(GIF_DIR, f"{c}-podium.gif"), caption=msg):
+                images += 1; time.sleep(2); continue
+        deliver_text(msg); texts += 1
         time.sleep(2)
-    log(f"{mode}: done ({len(msgs)} texts, {len(set(gifs))} gifs)")
+    log(f"{mode}: done ({texts} texts, {images} image-messages)")
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "test"
