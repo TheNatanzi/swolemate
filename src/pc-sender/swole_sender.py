@@ -156,6 +156,27 @@ def deliver_gif(filename):
     log(f"sent gif: {filename}")
     return True
 
+AUTOREMOTE_KEY = "fhRa6IJhcsA:APA91bGsi45wFYoTfVs4jkoD8_hv0KPGNywWR6z_i33AgqPdw3R23UHTJuTvkXX8GTgbOjdYUqyDsszuvA8rgit_N1xc5p2ynaTYjDaJz4VArsveyodTQgM"
+
+def fallback_text(text):
+    """Backup route: AutoRemote -> Tasker on the phone posts the text (works even if ADB/USB is down)."""
+    import urllib.parse
+    try:
+        url = "https://autoremotejoaomgcd.appspot.com/sendmessage?key=" + AUTOREMOTE_KEY + "&message=" + urllib.parse.quote("swole=:=" + text)
+        with urllib.request.urlopen(url, timeout=30) as r:
+            ok = r.status == 200
+        log(f"BACKUP route (Tasker) {'ok' if ok else 'FAILED'}: {text.splitlines()[0][:50]}")
+        time.sleep(18)  # Tasker needs time to type+send before the next message
+        return ok
+    except Exception as e:
+        log(f"BACKUP route error: {e!r}")
+        return False
+
+def send_text_resilient(text):
+    if device_ok() and deliver_text(text):
+        return True
+    return fallback_text(text)
+
 def fetch(params):
     with urllib.request.urlopen(f"{COACH}?{params}", timeout=120) as r:
         return json.loads(r.read())
@@ -175,11 +196,13 @@ def champion_from(text):
     return NAME2KEY.get(m2.group(1).lower()) if m2 else None
 
 def run(mode):
-    if not device_ok():
-        log(f"ABORT {mode}: no adb device"); return
-    wake(); home()
+    usb = device_ok()
+    if usb:
+        wake(); home()
+    else:
+        log(f"{mode}: no adb device — using BACKUP route (Tasker) for texts, images skipped")
     if mode == "test":
-        deliver_text("⚙️ pc-sender self-test ✅"); return
+        send_text_resilient("⚙️ pc-sender self-test ✅"); return
     params = {"daily": "daily=1", "mealam": "meal=am", "mealpm": "meal=pm", "monday": "monday=1"}[mode]
     d = fetch(params)
     if d.get("skipped"): log(f"{mode}: skipped ({d['skipped']})"); return
@@ -190,22 +213,22 @@ def run(mode):
     for msg in msgs:
         # LADDER / THRONE become ONE image message: composite gif of everyone + the text as caption
         gifset = "pixel" if "THE LADDER" in msg else ("got" if "THRONE ROOM" in msg else None)
-        if gifset:
+        if usb and gifset:
             people = parse_ladder_people(msg)
             if people:
                 comp = build_composite(people, gifset, f"_ladder_{gifset}_{stamp}.gif")
                 if deliver_gif_file(comp, caption=msg): images += 1
-                else: deliver_text(msg); texts += 1
+                else: send_text_resilient(msg); texts += 1
                 time.sleep(2); continue
-        if "YOUR CHAMPION" in msg:
+        if usb and "YOUR CHAMPION" in msg:
             c = champion_from(msg)
             if c and deliver_gif_file(os.path.join(GIF_DIR, f"{c}-podium.gif"), caption=msg):
                 images += 1; time.sleep(2); continue
-        if mode == "monday" and "LAST WEEK'S RESULTS" in msg:
+        if usb and mode == "monday" and "LAST WEEK'S RESULTS" in msg:
             c = champion_from(msg)
             if c and deliver_gif_file(os.path.join(GIF_DIR, f"{c}-podium.gif"), caption=msg):
                 images += 1; time.sleep(2); continue
-        deliver_text(msg); texts += 1
+        send_text_resilient(msg); texts += 1
         time.sleep(2)
     log(f"{mode}: done ({texts} texts, {images} image-messages)")
 
