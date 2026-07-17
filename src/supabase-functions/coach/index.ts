@@ -195,9 +195,20 @@ const MEAL_PM = [
   `night night... unless that dinner's still unlogged?? then WAKE UP ✍️`,
   `the diary closes at midnight like cinderella. log it before it turns into a pumpkin 🎃`,
 ];
+const MEAL_PM_UNDER = [
+  `logged but {n} cal under pace — dessert is ON THE TABLE tonight 🍨`,
+  `you're {n} cal behind pace. a snack stands between you and glory 🥜`,
+  `so close — {n} more cal to hit tonight's pace. finish strong 💪`,
+  `the log's alive but light: {n} cal under. mother prescribes a protein shake 🥤`,
+  `{n} cal short and the kitchen's still open. this is fixable, bestie`,
+  `under pace by {n} cal. eat something or accept tomorrow's roast 💅`,
+  `your macros are {n} cal behind schedule. late-night fuel run? 🌙`,
+  `almost there — {n} cal under pace. don't leave gains on the counter`,
+];
 async function composeMealCheck(sql, phase) {
   const today = laDate(0);
   const refs = await podRefs(sql);
+  const thresh = phase === "am" ? 0.20 : 0.70; // 20% by 3:30 data / 70% by 9pm data (shortcut pushes 6a,3:30p,9p,11:30p)
   const miss = [];
   for (const ref of refs) {
     const [u] = await sql`select id, display_name from fitness.app_user where cronometer_ref=${ref} limit 1`;
@@ -206,12 +217,16 @@ async function composeMealCheck(sql, phase) {
     if (!g?.calorie_goal) continue;
     const [d] = await sql`select coalesce(calories,0)::numeric cal from fitness.v_daily_latest where user_id=${u.id} and log_date=${today}`;
     const cal = Number(d?.cal ?? 0);
-    if (cal < g.calorie_goal * (phase === "am" ? 0.20 : 0.80)) miss.push(u.display_name); // 20% by 3:30 data / 80% by 9pm data (shortcut pushes 6a,3:30p,9p,11:30p)
+    if (cal < g.calorie_goal * thresh) miss.push({ name: u.display_name, cal, gap: Math.round(g.calorie_goal * thresh - cal) });
   }
   if (!miss.length) return null;
   const header = phase === "am" ? "🍳 *DID YOU EAT?* · breakfast + lunch check" : "🍽️ *DINNER CHECK*";
-  const pool = phase === "am" ? MEAL_AM : MEAL_PM;
-  return [header, ...miss.map((nm) => `*${nm}* — ${pick(pool)}`)].join("\n\n");
+  const used = new Set();
+  const line = (pool) => { let l = pick(pool); let guard = 0; while (used.has(l) && guard++ < 20) l = pick(pool); used.add(l); return l; };
+  return [header, ...miss.map((p) => {
+    const pool = (phase === "pm" && p.cal > 0) ? MEAL_PM_UNDER : (phase === "am" ? MEAL_AM : MEAL_PM);
+    return `*${p.name}* — ${fill(line(pool), { n: p.gap })}`;
+  })].join("\n\n");
 }
 
 const MEDALS = ["gold", "silver", "bronze", "poop"];

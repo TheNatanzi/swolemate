@@ -179,6 +179,19 @@ def send_text_resilient(text):
         return True
     return fallback_text(text)
 
+ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx4dXZhZ2d6bnl2Z3F4a25sbnZwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0NDk5NTcsImV4cCI6MjA5OTAyNTk1N30.qP7MWhAc-zV2W8-_1ZGkBmLj8E6Wc1K2QlYGad2-g1s"
+
+def fresh_pull():
+    """Trigger a Cronometer pull so meal checks judge fresh data (dinner logged 5 min ago counts)."""
+    try:
+        req = urllib.request.Request("https://lxuvaggznyvgqxknlnvp.supabase.co/functions/v1/cron-pull",
+                                     method="POST", headers={"Authorization": "Bearer " + ANON, "apikey": ANON})
+        with urllib.request.urlopen(req, timeout=120) as r:
+            ok = json.loads(r.read()).get("ok")
+        log(f"fresh cron-pull before check: ok={ok}")
+    except Exception as e:
+        log(f"fresh pull failed (using latest stored data): {e!r}")
+
 def fetch(params):
     with urllib.request.urlopen(f"{COACH}?{params}", timeout=120) as r:
         return json.loads(r.read())
@@ -206,6 +219,8 @@ def run(mode):
     if mode == "test":
         send_text_resilient("⚙️ pc-sender self-test ✅"); return
     params = {"daily": "daily=1", "mealam": "meal=am", "mealpm": "meal=pm", "monday": "monday=1"}[mode]
+    if mode in ("mealam", "mealpm"):
+        fresh_pull()
     d = fetch(params)
     if d.get("skipped"): log(f"{mode}: skipped ({d['skipped']})"); return
     msgs = d.get("messages", [])
