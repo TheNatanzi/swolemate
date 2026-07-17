@@ -49,7 +49,9 @@ def home():
     shell("input keyevent KEYCODE_HOME"); time.sleep(0.8)
 def wake():
     shell("input keyevent KEYCODE_WAKEUP"); time.sleep(0.8)
+    shell("wm dismiss-keyguard")  # no-op with lock disabled; safety if a lock ever gets enabled
     shell("svc power stayon usb")  # keep screen on while on USB
+    time.sleep(0.5)
 
 def wait_find(pattern, tries=6, delay=1.2):
     for _ in range(tries):
