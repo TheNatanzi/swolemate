@@ -206,7 +206,7 @@ async function composeMealCheck(sql, phase) {
     if (!g?.calorie_goal) continue;
     const [d] = await sql`select coalesce(calories,0)::numeric cal from fitness.v_daily_latest where user_id=${u.id} and log_date=${today}`;
     const cal = Number(d?.cal ?? 0);
-    if (cal < g.calorie_goal * (phase === "am" ? 0.20 : 0.70)) miss.push(u.display_name);
+    if (cal < g.calorie_goal * (phase === "am" ? 0.20 : 0.80)) miss.push(u.display_name); // 20% by 3:30 data / 80% by 9pm data (shortcut pushes 6a,3:30p,9p,11:30p)
   }
   if (!miss.length) return null;
   const header = phase === "am" ? "🍳 *DID YOU EAT?* · breakfast + lunch check" : "🍽️ *DINNER CHECK*";
