@@ -1,4 +1,4 @@
-// coach v21 — SwoleMate engine. daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
+// coach v28 — SwoleMate engine. meal checks skip users with no data push in 4h (silent pipe ≠ skipped meals). daily-read stats split onto 2 lines (after cal). meal thresholds 20% @4:30p, 70% @9:30p (+ under-pace flavor). daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
 // Ladders: daily streak -> Super Saiyan avatar level; weekly streak -> Game of Thrones level. Start L5 (app_config.ladder_start), ✅=+1 ❌=-1, clamp [1,10].
 // Daily ✅ = cals within ±5% + protein ≥95% + steps ≥95% (cardio users: ≥95% of weekly-goal/7). Weekly ✅ = those on week avgs + gym ≥100%.
 // Delivery: &tasker=1 -> phone AutoRemote -> WhatsApp GROUP (15s between messages). &send=1 -> Meta DMs. &me=1 = primary only.
@@ -60,7 +60,7 @@ function userLine(s) {
   const a = actDaily(s);
   const aura = auraOf(s);
   const logHit = (s.cal > 0 || s.prot > 0), protHit = !!s.goalProt && s.prot >= s.goalProt, calHit = ct === "on", gymHit = !!s.gymGoal && s.gymSessions >= s.gymGoal;
-  const line = `*${s.name}* ✨${aura}\n📝${ck(logHit)} 🥩${r0(s.prot)}g${ck(protHit)} 🍽️${r0(s.cal).toLocaleString()}cal${ck(calHit)} ${a.seg} · 🏋️${s.gymSessions}${ck(gymHit)}\n_${verdictLine(s)}_`;
+  const line = `*${s.name}* ✨${aura}\n📝${ck(logHit)} 🥩${r0(s.prot)}g${ck(protHit)} 🍽️${r0(s.cal).toLocaleString()}cal${ck(calHit)}\n${a.seg} · 🏋️${s.gymSessions}${ck(gymHit)}\n_${verdictLine(s)}_`;
   return { line, aura };
 }
 async function podRefs(sql) { return (await sql`select cronometer_ref from fitness.app_user where pod_id = (select pod_id from fitness.app_user where cronometer_ref='primary') and cronometer_ref is not null order by created_at`).map((r) => r.cronometer_ref); }
@@ -215,6 +215,13 @@ async function composeMealCheck(sql, phase) {
     if (!u) continue;
     const [g] = await sql`select calorie_goal from fitness.v_user_goal_latest where user_id=${u.id}`;
     if (!g?.calorie_goal) continue;
+    // Data-freshness gate: if their pipe hasn't delivered ANYTHING in 4h, assume the phone is silent (not that they skipped meals) — leave them out of the nudge.
+    const [f] = await sql`select greatest(
+      (select max(pulled_at) from fitness.daily_log where user_id=${u.id}),
+      (select max(pulled_at) from fitness.activity_log where user_id=${u.id}),
+      (select max(pulled_at) from fitness.cardio_log where user_id=${u.id})
+    ) as last_push`;
+    if (!f?.last_push || (Date.now() - new Date(f.last_push).getTime()) > 4 * 3600 * 1000) continue;
     const [d] = await sql`select coalesce(calories,0)::numeric cal from fitness.v_daily_latest where user_id=${u.id} and log_date=${today}`;
     const cal = Number(d?.cal ?? 0);
     if (cal < g.calorie_goal * thresh) miss.push({ name: u.display_name, cal, gap: Math.round(g.calorie_goal * thresh - cal) });

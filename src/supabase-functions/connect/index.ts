@@ -1,6 +1,7 @@
-// connect v2 — self-serve page for squad members to hook up their data sources.
+// connect v3 — self-serve page for squad members to hook up their data sources.
 // GET  ?u=<health_token>          -> page with live connection status, toddler-level directions,
 //                                    (A) Oura connect button, (B) Cronometer login form.
+// GET  ?u=<health_token>&api=1    -> JSON status {ok, name, oura, cron, oura_url} for the static connect.html page.
 // POST {u, email, password}       -> verifies the Cronometer login actually works, then stores it in
 //                                    fitness.cronometer_account (food_only=true; workouts come from Oura).
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
