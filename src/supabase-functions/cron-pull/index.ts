@@ -1,3 +1,10 @@
+// cron-pull v17 — scrapes Cronometer for the squad and writes the tables the coach reads.
+// v17: multi-account. Primary comes from CRONOMETER_EMAIL/PASSWORD env (full pull: food + gym + cardio).
+//      Extra members live in fitness.cronometer_account (user_id, email, password, food_only).
+//      food_only=true (default) pulls just calories/protein — their workouts come from Oura (cron-pull-oura),
+//      so writing Cronometer exercises too would race in the v_*_latest views.
+// Default pull window = the CURRENT week (Mon..today): edits heal within the week, past weeks are frozen.
+// Grace: Monday before 12pm LA also re-pulls LAST week so Sunday-night logging lands before the noon recap.
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 
 const BASE = "https://cronometer.com";
@@ -65,8 +72,6 @@ function parseCardio(csv) { const byDay = {}; for (const r of rows(csv)) { const
 function laDate(offsetDays = 0) { const d = new Date(Date.now() + offsetDays * 86400000); return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(d); }
 const addDays = (s, n) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const laHour = () => parseInt(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour12: false, hour: "2-digit" }).format(new Date()), 10);
-// Default pull window = the CURRENT week (Mon..today): edits heal within the week, past weeks are frozen.
-// Grace: Monday before 12pm LA also re-pulls LAST week so Sunday-night logging lands before the noon recap.
 function weekWindowStart() {
   const today = laDate(0);
   const dow = new Date(today + "T12:00:00Z").getUTCDay(); // 1 = Monday
@@ -74,41 +79,65 @@ function weekWindowStart() {
   return (dow === 1 && laHour() < 12) ? addDays(thisMonday, -7) : thisMonday;
 }
 
+async function pullAccount(sql, acct, start, end, dryRun) {
+  const s = await login(acct.email, acct.password);
+  const dailyCsv = await exportCsv(s, "dailySummary", start, end);
+  // --- CANARY SHAPE CHECK (distinguishes "didn't log" from "scraper broke") ---
+  if (!/Energy \(kcal\)/i.test(dailyCsv)) {
+    throw new Error(`SCRAPE_BREAK[${acct.name}]: dailySummary export malformed — no 'Energy (kcal)' column (login expired or Cronometer changed). First 120 chars: ` + dailyCsv.slice(0, 120).replace(/\s+/g, " "));
+  }
+  const days = parseDaily(dailyCsv);
+  let gym = {}, cardio = {};
+  if (!acct.food_only) {
+    const exerciseCsv = await exportCsv(s, "exercises", start, end);
+    gym = parseGym(exerciseCsv);
+    cardio = parseCardio(exerciseCsv);
+  }
+  let food = 0, gymRows = 0, cardioRows = 0;
+  if (!dryRun) {
+    for (const d of days) { await sql`insert into fitness.daily_log (user_id, log_date, calories, protein_g, food_logged, raw) values (${acct.user_id}, ${d.log_date}, ${d.calories}, ${d.protein_g}, ${d.food_logged}, ${sql.json(d.raw)})`; food++; }
+    for (const [day, g] of Object.entries(gym)) { await sql`insert into fitness.gym_log (user_id, log_date, sessions, minutes, names, raw) values (${acct.user_id}, ${day}, ${g.sessions}, ${g.minutes}, ${g.names}, ${sql.json(g.raw)})`; gymRows++; }
+    for (const [day, c] of Object.entries(cardio)) { await sql`insert into fitness.cardio_log (user_id, log_date, minutes, names, raw) values (${acct.user_id}, ${day}, ${c.minutes}, ${c.names}, ${sql.json(c.raw)})`; cardioRows++; }
+  }
+  return {
+    account: acct.name, food_only: acct.food_only,
+    food_days: days.map((d) => ({ log_date: d.log_date, calories: d.calories, protein_g: d.protein_g })),
+    gym_days: Object.entries(gym).map(([day, g]) => ({ log_date: day, sessions: g.sessions, names: g.names })),
+    cardio_days: Object.entries(cardio).map(([day, c]) => ({ log_date: day, minutes: c.minutes, names: c.names })),
+    rows_written: { food, gym: gymRows, cardio: cardioRows },
+  };
+}
+
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const start = url.searchParams.get("start") ?? weekWindowStart();
   const end = url.searchParams.get("end") ?? laDate(0);
   const dryRun = url.searchParams.get("dry") === "1";
+  const only = url.searchParams.get("only"); // limit to one account by name (debug)
   const sql = postgres(Deno.env.get("SUPABASE_DB_URL"), { prepare: false });
   try {
     const email = Deno.env.get("CRONOMETER_EMAIL");
     const password = Deno.env.get("CRONOMETER_PASSWORD");
     if (!email || !password) throw new Error("Missing CRONOMETER_EMAIL / CRONOMETER_PASSWORD secrets");
-    const s = await login(email, password);
+    const [pu] = await sql`select id from fitness.app_user where cronometer_ref = 'primary' limit 1`;
+    if (!pu) throw new Error("No primary app_user found");
+
     const gen = url.searchParams.get("gen");
-    if (gen) return Response.json({ ok: true, generate: gen, csv: await exportCsv(s, gen, start, end) });
-    const dailyCsv = await exportCsv(s, "dailySummary", start, end);
-    const exerciseCsv = await exportCsv(s, "exercises", start, end);
-    // --- CANARY SHAPE CHECK (distinguishes "didn't log" from "scraper broke") ---
-    // A broken login/session returns an HTML/error page (HTTP 200), which parseDaily would silently read as
-    // 0 kcal and log ok=true. Require the real Cronometer column so ok=false means a GENUINE break.
-    // A valid-but-empty export (you just didn't log) STILL has this header row, so it passes -> ok=true, calm.
-    if (!/Energy \(kcal\)/i.test(dailyCsv)) {
-      throw new Error("SCRAPE_BREAK: dailySummary export malformed — no 'Energy (kcal)' column (login expired or Cronometer changed). First 120 chars: " + dailyCsv.slice(0, 120).replace(/\s+/g, " "));
+    if (gen) { const s = await login(email, password); return Response.json({ ok: true, generate: gen, csv: await exportCsv(s, gen, start, end) }); }
+
+    const extra = await sql`select ca.user_id, ca.email, ca.password, ca.food_only, au.display_name from fitness.cronometer_account ca join fitness.app_user au on au.id = ca.user_id where ca.user_id <> ${pu.id}`;
+    const accounts = [
+      { user_id: pu.id, email, password, food_only: false, name: "primary" },
+      ...extra.map((r) => ({ user_id: r.user_id, email: r.email, password: r.password, food_only: r.food_only, name: r.display_name })),
+    ].filter((a) => !only || a.name.toLowerCase() === only.toLowerCase());
+
+    const results = [], errors = [];
+    for (const acct of accounts) {
+      try { results.push(await pullAccount(sql, acct, start, end, dryRun)); }
+      catch (e) { errors.push(`${acct.name}: ${String(e instanceof Error ? e.message : e)}`); }
     }
-    const days = parseDaily(dailyCsv);
-    const gym = parseGym(exerciseCsv);
-    const cardio = parseCardio(exerciseCsv);
-    let food = 0, gymRows = 0, cardioRows = 0;
-    if (!dryRun) {
-      const [u] = await sql`select id from fitness.app_user where cronometer_ref = 'primary' limit 1`;
-      if (!u) throw new Error("No primary app_user found");
-      for (const d of days) { await sql`insert into fitness.daily_log (user_id, log_date, calories, protein_g, food_logged, raw) values (${u.id}, ${d.log_date}, ${d.calories}, ${d.protein_g}, ${d.food_logged}, ${sql.json(d.raw)})`; food++; }
-      for (const [day, g] of Object.entries(gym)) { await sql`insert into fitness.gym_log (user_id, log_date, sessions, minutes, names, raw) values (${u.id}, ${day}, ${g.sessions}, ${g.minutes}, ${g.names}, ${sql.json(g.raw)})`; gymRows++; }
-      for (const [day, c] of Object.entries(cardio)) { await sql`insert into fitness.cardio_log (user_id, log_date, minutes, names, raw) values (${u.id}, ${day}, ${c.minutes}, ${c.names}, ${sql.json(c.raw)})`; cardioRows++; }
-      await sql`insert into fitness.health_check (ok, error) values (true, null)`;
-    }
-    return Response.json({ ok: true, range: { start, end }, food_days: days.map((d) => ({ log_date: d.log_date, calories: d.calories, protein_g: d.protein_g })), gym_days: Object.entries(gym).map(([day, g]) => ({ log_date: day, sessions: g.sessions, names: g.names })), cardio_days: Object.entries(cardio).map(([day, c]) => ({ log_date: day, minutes: c.minutes, names: c.names })), rows_written: { food, gym: gymRows, cardio: cardioRows } });
+    if (!dryRun) await sql`insert into fitness.health_check (ok, error) values (${errors.length === 0}, ${errors.length ? errors.join(" | ") : null})`;
+    return Response.json({ ok: errors.length === 0, range: { start, end }, results, errors: errors.length ? errors : undefined });
   } catch (e) {
     const msg = String(e instanceof Error ? e.message : e);
     try { await sql`insert into fitness.health_check (ok, error) values (false, ${msg})`; } catch { /* ignore */ }
