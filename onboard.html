@@ -51,6 +51,10 @@
   .appsub{display:flex;align-items:center;gap:7px;font-weight:800;font-size:14px;margin:16px 0 4px;padding-top:12px;border-top:1px solid var(--line);color:var(--ink)}
   .appsub.first{border-top:none;padding-top:2px;margin-top:8px}
   .flag{display:inline-block;font-size:11px;font-weight:800;color:var(--green);background:#05301f;border:1px solid var(--green);border-radius:999px;padding:2px 9px;margin-left:6px}
+  .card.done{border-color:var(--green)}
+  .okline{margin:0;color:#b9f5d8;font-weight:700}
+  .warn{font-size:12.5px;color:var(--gold);margin-top:8px}
+  .lead{color:var(--muted);font-size:14px;margin:0 0 4px;line-height:1.55}
 </style>
 </head>
 <body>
@@ -109,7 +113,34 @@
 
       <button id="save">Save my info</button>
 
-      <h2>5 · Connect your health</h2>
+      <h2>5 · Connect your accounts</h2>
+      <div class="card">
+        <p class="lead">Got an <b>Oura account</b> or use <b>Cronometer</b>? Connect them here and you're basically done — we pull your numbers automatically. 💪 <span style="color:var(--dim)">(No account for one of them? Skip it and use the Apple Health method in step 6.)</span></p>
+
+        <div class="part">💍 Your Oura<div class="why">Sees your steps, workouts + sleep. We never see your Oura password — you log in on Oura's own site.</div></div>
+        <div id="ouraTodo">
+          <div class="step"><div class="sn">1</div><div>Tap the <b>green button</b> below.</div></div>
+          <div class="step"><div class="sn">2</div><div>Log in with your <b>Oura email + password</b> (same as the Oura app).</div></div>
+          <div class="step"><div class="sn">3</div><div>Tap <b>"Accept"</b> when Oura asks. Done — your data flows in by itself. 🎉</div></div>
+          <a class="bigbtn" id="ouraBtn" href="#">Connect my Oura</a>
+        </div>
+        <p class="okline" id="ouraDone" style="display:none">Oura already connected ✅ Nothing to do here.</p>
+
+        <div class="appsub">🔥 Your Cronometer</div>
+        <div id="cronTodo">
+          <div class="step"><div class="sn">1</div><div>Type the <b>same email + password</b> you use to open the Cronometer app.</div></div>
+          <div class="step"><div class="sn">2</div><div>Tap <b>Connect</b>. We test the login right away — you'll know instantly if there's a typo.</div></div>
+          <label>Cronometer email</label><input id="cronEmail" type="email" autocomplete="username" placeholder="you@email.com">
+          <div style="height:12px"></div>
+          <label>Cronometer password</label><input id="cronPass" type="password" autocomplete="current-password">
+          <button id="cronSave">Connect Cronometer</button>
+          <p class="warn">⚠️ If you turned on two-factor login in Cronometer, turn it off first: cronometer.com → Settings → Account.</p>
+          <div class="msg" id="cronMsg"></div>
+        </div>
+        <p class="okline" id="cronDone" style="display:none">Cronometer already connected ✅ Nothing to do here.</p>
+      </div>
+
+      <h2>6 · Connect your health</h2>
       <div class="card">
         <p style="color:var(--muted);font-size:14px;margin:0 0 4px;line-height:1.55">This is the only techy part — I'll hold your hand through <b>every single tap</b>. Do it once and never touch it again. 🫶 <b>iPhone only.</b></p>
 
@@ -236,7 +267,42 @@
     finally { $("save").disabled = false; }
   });
 
+  // ---- Section 5: direct Oura + Cronometer account connections (via connect fn) ----
+  const CONNECT_API = "https://lxuvaggznyvgqxknlnvp.supabase.co/functions/v1/connect";
+  async function loadConnect() {
+    if (!token) return;
+    try {
+      const r = await fetch(CONNECT_API + "?u=" + encodeURIComponent(token) + "&api=1");
+      const d = await r.json();
+      if (!d.ok) return;
+      if (d.oura_url) $("ouraBtn").href = d.oura_url;
+      $("ouraTodo").style.display = d.oura ? "none" : "block";
+      $("ouraDone").style.display = d.oura ? "block" : "none";
+      $("cronTodo").style.display = d.cron ? "none" : "block";
+      $("cronDone").style.display = d.cron ? "block" : "none";
+    } catch (e) { /* leave the connect UI in its default "not yet" state */ }
+  }
+
+  $("cronSave").addEventListener("click", async () => {
+    const m = $("cronMsg"); m.className = "msg";
+    const email = $("cronEmail").value.trim(), pass = $("cronPass").value;
+    if (!email || !pass) { m.className = "msg err"; m.textContent = "Fill in both boxes."; return; }
+    $("cronSave").disabled = true; $("cronSave").textContent = "Checking your login…";
+    try {
+      const r = await fetch(CONNECT_API, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ u: token, email: email, password: pass }) });
+      const d = await r.json();
+      if (!d.ok) throw new Error(d.error || "failed");
+      m.className = "msg ok"; m.textContent = "Connected ✅ You're done!";
+      $("cronTodo").style.display = "none"; $("cronDone").style.display = "block";
+    } catch (e) {
+      m.className = "msg err"; m.textContent = "Couldn't connect: " + String(e.message || e);
+      $("cronSave").disabled = false; $("cronSave").textContent = "Connect Cronometer";
+    }
+  });
+
   load();
+  loadConnect();
 </script>
 </body>
 </html>
