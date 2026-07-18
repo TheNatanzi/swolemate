@@ -32,7 +32,9 @@ const toMinutes = (s) => {
   }
   const n = parseFloat(t.replace(/[^\d.]/g, ""));
   if (!Number.isFinite(n)) return 0;
-  return /sec/i.test(t) ? n / 60 : /\bh(ou)?r/i.test(t) ? n * 60 : n;
+  if (/sec/i.test(t)) return n / 60;
+  if (/\bh(ou)?r/i.test(t)) return n * 60;
+  return n > 300 ? n / 60 : n; // unlabeled number over 300 = seconds (no single workout runs 5+ hours)
 };
 const GYM_RX = /strength|weight|functional|core\s*training|cross\s*training/i;
 function parseWk(raw) {
