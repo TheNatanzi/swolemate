@@ -1,13 +1,17 @@
-// oura-oauth v8 — connects a squad member's Oura account.
+// oura-oauth v9 — connects a squad member's Oura account.
 // Start: ?go=1&token=<goals_token>&u=<health_token>  (u omitted -> primary user, back-compat).
 // The health_token rides through OAuth `state` as "<goals_token>.<health_token>" so the callback
 // knows which app_user to store the tokens for.
+// v9: after storing tokens the callback VERIFIES them with a live Oura API call, then redirects
+// back to the connect page (connect.html?u=...&oura=ok|&oura_err=...) so members land somewhere
+// human instead of a raw HTML blob (in-app browsers rendered the old callback page as source text).
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 
 const CALLBACK = "https://lxuvaggznyvgqxknlnvp.supabase.co/functions/v1/oura-oauth";
 const AUTHORIZE = "https://cloud.ouraring.com/oauth/authorize";
 const TOKEN = "https://api.ouraring.com/oauth/token";
 const SCOPE = "daily workout personal";
+const CONNECT_PAGE = "https://thenatanzi.github.io/swolemate/connect.html";
 
 const html = (msg, status = 200) => new Response(
   `<!doctype html><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><body style="font-family:-apple-system,sans-serif;background:#0b141a;color:#e9edef;display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0"><div style="max-width:420px;padding:24px;text-align:center"><h1 style="color:#00a884">${msg}</h1></div></body>`,
@@ -49,15 +53,21 @@ Deno.serve(async (req) => {
         headers: { "content-type": "application/x-www-form-urlencoded", "Authorization": "Basic " + btoa(`${clientId}:${clientSecret}`) },
         body: new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: CALLBACK }).toString(),
       });
+      const back = (q) => healthToken
+        ? Response.redirect(`${CONNECT_PAGE}?u=${encodeURIComponent(healthToken)}&${q}`, 302)
+        : null;
       const tok = await res.json().catch(() => ({}));
-      if (!tok.access_token) return html("Connection failed: " + JSON.stringify(tok).slice(0, 160), 500);
+      if (!tok.access_token) return back(`oura_err=${encodeURIComponent("Oura didn't accept the login — try again")}`) ?? html("Connection failed: " + JSON.stringify(tok).slice(0, 160), 500);
       const [u] = healthToken
         ? await sql`select id, display_name from fitness.app_user where health_token = ${healthToken} limit 1`
         : await sql`select id, display_name from fitness.app_user where cronometer_ref = 'primary' limit 1`;
-      if (!u) return html("Unknown user for this connect link", 400);
+      if (!u) return back(`oura_err=${encodeURIComponent("unknown user — ask Medi for a fresh link")}`) ?? html("Unknown user for this connect link", 400);
+      // Live test: the token must actually read data before we call it connected.
+      const test = await fetch("https://api.ouraring.com/v2/usercollection/personal_info", { headers: { Authorization: `Bearer ${tok.access_token}` } });
+      if (!test.ok) return back(`oura_err=${encodeURIComponent(`Oura connected but the data test failed (HTTP ${test.status}) — tell Medi`)}`) ?? html(`Token test failed (HTTP ${test.status})`, 500);
       const expires = new Date(Date.now() + (tok.expires_in ?? 86400) * 1000).toISOString();
       await sql`insert into fitness.oura_token (user_id, access_token, refresh_token, expires_at, updated_at) values (${u.id}, ${tok.access_token}, ${tok.refresh_token}, ${expires}, now()) on conflict (user_id) do update set access_token = excluded.access_token, refresh_token = excluded.refresh_token, expires_at = excluded.expires_at, updated_at = now()`;
-      return html(`Oura connected for ${u.display_name}! ✅ You can close this tab.`);
+      return back("oura=ok") ?? html(`Oura connected for ${u.display_name}! ✅ You can close this tab.`);
     }
     return html("Fitness Oura connector");
   } catch (e) {

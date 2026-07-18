@@ -111,8 +111,14 @@
     $("cronDone").style.display = d.cron ? "block" : "none";
   }
 
+  function ouraBanner() {
+    if (params.get("oura") === "ok") showPage("ok", "Oura connected ✅ Tested and working. Now do step 2 below if you haven't.");
+    else if (params.get("oura_err")) showPage("err", "Oura problem: " + params.get("oura_err"));
+  }
+
   async function load() {
     if (!token) { $("hi").textContent = "Missing your link"; $("tagline").textContent = "Ask Medi for your personal connect link."; return; }
+    ouraBanner();
     try {
       const r = await fetch(API + "?u=" + encodeURIComponent(token) + "&api=1");
       const d = await r.json();
