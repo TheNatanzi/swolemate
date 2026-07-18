@@ -73,8 +73,9 @@ Deno.serve(async (req) => {
     const cals = toNum(pick(src, "calories", "cals", "energy"));
     const protein = toNum(pick(src, "protein"));
     const cardio = toNum(pick(src, "cardio_min", "cardio", "cardio_minutes", "cardiomin")) ?? (wk ? Math.round(wk.cardio.reduce((a, w) => a + w.min, 0)) : null);
-    let date = String(pick(src, "date") ?? "");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = laDate();
+    let date = String(pick(src, "date") ?? "").trim().toLowerCase();
+    if (date === "yesterday" || date === "yday" || date === "-1") date = addDays(laDate(), -1);
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) date = laDate();
 
     // --- WEEK LOCK ---
     const today = laDate();
