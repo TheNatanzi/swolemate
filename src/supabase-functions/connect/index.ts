@@ -119,11 +119,15 @@ Deno.serve(async (req) => {
     }
     const token = url.searchParams.get("u") ?? "";
     const [u] = token ? await sql`select id, display_name, health_token from fitness.app_user where health_token = ${token} limit 1` : [];
-    if (!u) return new Response("Ask Medi for your personal connect link.", { status: 401, headers: { "content-type": "text/plain" } });
+    if (!u) {
+      if (url.searchParams.get("api") === "1") return json({ ok: false, error: "unknown link — ask Medi for a fresh one" }, 401);
+      return new Response("Ask Medi for your personal connect link.", { status: 401, headers: { "content-type": "text/plain" } });
+    }
     const cfg = await sql`select value from fitness.app_config where key = 'goals_token'`;
     const [oura] = await sql`select 1 from fitness.oura_token where user_id = ${u.id} limit 1`;
     const [cron] = await sql`select 1 from fitness.cronometer_account where user_id = ${u.id} limit 1`;
     const ouraUrl = `${OURA_START}?go=1&token=${encodeURIComponent(cfg[0]?.value ?? "")}&u=${encodeURIComponent(u.health_token)}`;
+    if (url.searchParams.get("api") === "1") return json({ ok: true, name: u.display_name, oura: !!oura, cron: !!cron, oura_url: ouraUrl });
     return new Response(page(u.display_name, ouraUrl, { oura: !!oura, cron: !!cron }), { headers: { "content-type": "text/html; charset=utf-8" } });
   } catch (e) {
     return json({ ok: false, error: String(e instanceof Error ? e.message : e) }, 500);
