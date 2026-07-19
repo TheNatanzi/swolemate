@@ -1,4 +1,5 @@
-// coach v28 — SwoleMate engine. meal checks skip users with no data push in 4h (silent pipe ≠ skipped meals). daily-read stats split onto 2 lines (after cal). meal thresholds 20% @4:30p, 70% @9:30p (+ under-pace flavor). daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
+// coach v29 — WEEK SO FAR now matches THE DAILY READ: sorted best-first + stats split onto 2 lines (📝🥩🍽️ | activity·🏋️).
+// coach v28 base — SwoleMate engine. meal checks skip users with no data push in 4h (silent pipe ≠ skipped meals). daily-read stats split onto 2 lines (after cal). meal thresholds 20% @4:30p, 70% @9:30p (+ under-pace flavor). daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
 // Ladders: daily streak -> Super Saiyan avatar level; weekly streak -> Game of Thrones level. Start L5 (app_config.ladder_start), ✅=+1 ❌=-1, clamp [1,10].
 // Daily ✅ = cals within ±5% + protein ≥95% + steps ≥95% (cardio users: ≥95% of weekly-goal/7). Weekly ✅ = those on week avgs + gym ≥100%.
 // Delivery: &tasker=1 -> phone AutoRemote -> WhatsApp GROUP (15s between messages). &send=1 -> Meta DMs. &me=1 = primary only.
@@ -106,7 +107,7 @@ async function weekAll(sql, offset = 0) {
   return out;
 }
 function composeWTD(arr) {
-  const blocks = arr.map((w) => `*${w.name}*  (${w.score}/5)\n🥩${w.avgProt}g${ck(w.protPt)} 🍽️${w.avgCal.toLocaleString()}cal${ck(w.calPt)} ${actWeek(w).seg} · 🏋️${w.gym}${ck(w.gymPt)} · 📝${w.loggedDays}/${w.daysElapsed}${ck(w.logPt)}`);
+  const blocks = [...arr].sort((a, b) => b.score - a.score).map((w) => `*${w.name}*  (${w.score}/5)\n📝${w.loggedDays}/${w.daysElapsed}${ck(w.logPt)} 🥩${w.avgProt}g${ck(w.protPt)} 🍽️${w.avgCal.toLocaleString()}cal${ck(w.calPt)}\n${actWeek(w).seg} · 🏋️${w.gym}${ck(w.gymPt)}`);
   return ["📊 *WEEK SO FAR* · avg/day", ...blocks].join("\n\n");
 }
 
