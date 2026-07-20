@@ -42,7 +42,7 @@ ladder = ('<span class="hd">⚡ THE LADDER · daily avatar</span><br><br>'
   + av_row("medi","pixel",7,"🔺","Medi","Pumped","up a level. mother is EVOLVING")
   + av_row("teyaum","pixel",6,"🔺","Teyaum","Warming Up","climbed. the glow-up is REAL")
   + av_row("gizem","pixel",4,"🔻","Gizem","Donut Sulker","slipped a level. gravity said hi 💀")
-  + '<div class="foot"><i>hit your day (cals · protein · steps, all within 5%) = climb. miss = sink. L1 couch goblin ⇄ L10 SUPER SAIYAN</i></div>')
+  + '<div class="foot"><i>hit your day (cals · protein · steps, all within 5%) = climb. miss = sink. L1 Jabba the Hutt ⇄ L10 SUPER SAIYAN</i></div>')
 
 # ---------- meal checks ----------
 meal_am = """<span class="hd">🍳 DID YOU EAT? · breakfast + lunch check</span><br><br><b>Gizem</b> — breakfast? lunch? hello?? your food log is a ghost town 👻"""

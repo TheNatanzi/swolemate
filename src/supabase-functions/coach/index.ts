@@ -165,7 +165,7 @@ const MEAL_AM = [
   `logging takes less time than reading this roast. PROVE IT`,
   `you're not mysterious for not logging, you're just behind 💅`,
   `the diary is on a hunger strike apparently. negotiate. log something`,
-  `zero entries?? even the couch goblin logs his burgers 🍔`,
+  `zero entries?? even Jabba the Hutt logs his burgers 🍔`,
   `we track five pillars and you're currently offering NONE. rally.`,
   `your protein doesn't count if it's a secret. declassify the meals 📂`,
 ];
@@ -302,7 +302,7 @@ async function resetSeason(sql) {
 
 // ===== STREAK LADDERS -> AVATAR LEVELS =====
 // Daily ladder = Super Saiyan set (moves every day). Weekly ladder = Game of Thrones set (moves every completed Mon-Sun week).
-const SS_TIERS = ["Couch Goblin", "Soda Slob", "Fry Fiend", "Donut Sulker", "Fresh Start", "Warming Up", "Pumped", "Iron Presser", "Deadlift Beast", "SUPER SAIYAN"];
+const SS_TIERS = ["Jabba the Hutt", "Soda Slob", "Fry Fiend", "Donut Sulker", "Fresh Start", "Warming Up", "Pumped", "Iron Presser", "Deadlift Beast", "SUPER SAIYAN"];
 const GOT_M = ["Flea Bottom Peasant", "Gutter Urchin", "Tavern Servant", "Conscript Spearman", "Sellsword", "Anointed Knight", "Landed Lord", "Warden of the Realm", "Crowned King", "TARGARYEN DRAGONLORD"];
 const GOT_F = ["Flea Bottom Peasant", "Gutter Urchin", "Tavern Servant", "Conscript Spearwoman", "Sellsword", "Anointed Knight", "Landed Lady", "Warden of the Realm", "Crowned Queen", "TARGARYEN DRAGON QUEEN"];
 const addDays = (s, n) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
@@ -379,7 +379,7 @@ async function composeLadderDaily(sql) {
   if (!us.length) return null;
   const rows = us.map((u) => { const r = dailyLadder(u); return { name: u.display_name, ...r }; }).sort((a, b) => b.lvl - a.lvl);
   const lines = rows.map((r) => ladderLine(r.name, r.lvl, SS_TIERS[r.lvl - 1], r.moved));
-  return ["⚡ *THE LADDER · daily avatar*", ...lines, "_hit your day (cals · protein · steps, all within 5%) = climb. miss = sink. L1 couch goblin ⇄ L10 SUPER SAIYAN_"].join("\n\n");
+  return ["⚡ *THE LADDER · daily avatar*", ...lines, "_hit your day (cals · protein · steps, all within 5%) = climb. miss = sink. L1 Jabba the Hutt ⇄ L10 SUPER SAIYAN_"].join("\n\n");
 }
 async function composeLadderWeekly(sql) {
   const us = await ladderData(sql);

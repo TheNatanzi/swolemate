@@ -5,7 +5,7 @@ import os, io, base64, html as H
 from PIL import Image, ImageSequence
 SRC="Avatars/generated"
 PEOPLE=[("medi","Medi","#5b8cff"),("teyaum","Teyaum","#3ec8c0"),("gizem","Gizem","#b07bff"),("rinad","Rinad","#ff7bb0")]
-SSNAMES={1:"Couch Goblin",2:"Soda Slob",3:"Fry Fiend",4:"Donut Sulker",5:"Fresh Start",
+SSNAMES={1:"Jabba the Hutt",2:"Soda Slob",3:"Fry Fiend",4:"Donut Sulker",5:"Fresh Start",
          6:"Warming Up",7:"Pumped",8:"Iron Presser",9:"Deadlift Beast",10:"Super Saiyan"}
 def datauri(path,w=190,colors=64):
     im=Image.open(path); frames=[]; durs=[]
@@ -41,7 +41,7 @@ figcaption{{padding:8px 6px 10px;font-size:12.5px;color:var(--muted)}} footer{{t
 </style>
 <div class="wrap"><header>
 <h1>The Daily Ladder</h1>
-<p class="sub">SwoleMate's <b style="color:var(--gold)">daily-streak</b> avatar set — Super Saiyan. Couch-goblin to blond super-saiyan god. (Weekly streaks use the Game of Thrones set.)</p>
+<p class="sub">SwoleMate's <b style="color:var(--gold)">daily-streak</b> avatar set — Super Saiyan. Jabba the Hutt to blond super-saiyan god. (Weekly streaks use the Game of Thrones set.)</p>
 <div class="rule"><b>How you climb:</b> everyone starts at <b>Level 5</b>. Log + hit your day (calories, protein, steps/cardio all within 5%) → <b>+1</b>. Miss it → <b>−1</b>. Floor L1, ceiling L10.</div>
 </header>{"".join(cards)}
 <footer>40 avatars · 4 warriors · 10 tiers · daily-streak ladder</footer></div>"""
@@ -80,7 +80,7 @@ TEASER=f"""<section>
       <div class="card" style="text-align:center">
         <div class="num" style="color:var(--gold)">DAILY STREAK</div><h3 style="margin:4px 0 14px">Super Saiyan ladder</h3>
         <img src="{ss_l5}" alt="daily level 5" style="width:150px;border-radius:12px;image-rendering:pixelated">
-        <p style="margin-top:12px">Log every day and ascend from couch-goblin to blond super-saiyan. Miss a day, slide back down.</p>
+        <p style="margin-top:12px">Log every day and ascend from Jabba the Hutt to blond super-saiyan. Miss a day, slide back down.</p>
       </div>
       <div class="card" style="text-align:center">
         <div class="num" style="color:var(--blue)">WEEKLY STREAK</div><h3 style="margin:4px 0 14px">Game of Thrones ladder</h3>
@@ -112,7 +112,7 @@ DETAILED=f"""<section>
     <h2 class="rise">Four faces. Two ladders each. Twenty tiers of glory and shame.</h2>
     <p class="lede rise">One selfie per person becomes <b>two full hand-made animated ladders</b> — a daily Super Saiyan climb and a weekly Game of Thrones climb, every tier a 3-frame motion loop, face-locked. Scroll each row →</p>
     {blocks}
-    <div class="safe rise" style="margin-top:24px">Start at Level 5 · ✅ climbs a tier · ❌ drops one. Miss enough and you're a couch-goblin / Flea Bottom peasant; string wins together and you're a super-saiyan / Targaryen dragon-monarch.</div>
+    <div class="safe rise" style="margin-top:24px">Start at Level 5 · ✅ climbs a tier · ❌ drops one. Miss enough and you're Jabba the Hutt / Flea Bottom peasant; string wins together and you're a super-saiyan / Targaryen dragon-monarch.</div>
   </div>
 </section>"""
 
