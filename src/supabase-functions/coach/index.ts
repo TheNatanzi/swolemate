@@ -1,3 +1,7 @@
+// coach v33 (2026-07) — steps/cardio ADDED BACK to messages + scoring (pipes verified working). Score = /5
+// (log+protein+cal+ACTIVITY+gym). Activity = per-user metric: steps (daily vs steps_goal / weekly avg) or
+// cardio (week-to-date minutes vs weekly cardio_goal). Grids get a 👟/🏃 column; weekly ✅ needs activity ≥95%;
+// Close the Gap nudges on steps/cardio; aura includes activity again.
 // coach v32 (2026-07) — Tonight's Score gym cell always shows n/goal, with ✅ APPENDED when the weekly goal is hit (was: ✅ replaced the numbers).
 // coach v31 (2026-07) — FIX: Tonight's Score gym/cardio week window now = Tue-Sun LA week (curTue). It used
 // Postgres date_trunc('week', current_date), which runs on UTC — after 5pm LA on Sundays that's already NEXT
@@ -42,7 +46,7 @@ function actDaily(s) {
   const hit = !!s.stepsGoal && s.steps >= s.stepsGoal;
   return { pts: stepPts(s.steps, s.stepsGoal), hit, tier: stepTier(s.steps, s.stepsGoal), seg: `👟${stepsShort(s.steps)}${ck(hit)}` };
 }
-const auraOf = (s) => protPts(s.prot, s.goalProt) + calPts(s.cal, s.goalCal) + (gymTier(s.gymSessions, s.gymGoal) === "slay" ? 100 : s.gymSessions > 0 ? 50 : 0);
+const auraOf = (s) => protPts(s.prot, s.goalProt) + calPts(s.cal, s.goalCal) + actDaily(s).pts + (gymTier(s.gymSessions, s.gymGoal) === "slay" ? 100 : s.gymSessions > 0 ? 50 : 0);
 function verdictLine(s) {
   const gt = gymTier(s.gymSessions, s.gymGoal), at = actDaily(s).tier, pt = protTier(s.prot, s.goalProt), ct = calTier(s.cal, s.goalCal);
   const perfect = gt === "slay" && at === "slay" && ct === "on" && pt === "slay";
@@ -70,7 +74,7 @@ function scoreRow(s) {
   const ct = calTier(s.cal, s.goalCal);
   const logHit = (s.cal > 0 || s.prot > 0), protHit = !!s.goalProt && s.prot >= s.goalProt, calHit = ct === "on", gymHit = !!s.gymGoal && s.gymSessions >= s.gymGoal;
   const gymStr = s.gymGoal ? `${s.gymSessions}/${s.gymGoal}${gymHit ? "✅" : ""}` : `${s.gymSessions}`;
-  return { name: s.name, aura: auraOf(s), logHit, protHit, calHit, gymStr };
+  return { name: s.name, aura: auraOf(s), logHit, protHit, calHit, gymStr, actSeg: actDaily(s).seg };
 }
 async function podRefs(sql) { return (await sql`select cronometer_ref from fitness.app_user where pod_id = (select pod_id from fitness.app_user where cronometer_ref='primary') and cronometer_ref is not null order by created_at`).map((r) => r.cronometer_ref); }
 async function composeGroup(sql) {
@@ -78,7 +82,7 @@ async function composeGroup(sql) {
   for (const ref of refs) { try { arr.push(await statsForUser(sql, ref, laDate(0))); } catch { /* skip */ } }
   const rows = arr.map(scoreRow).sort((a, b) => b.aura - a.aura);
   const w = Math.max(6, ...rows.map((r) => r.name.length)) + 1;
-  const lines = rows.map((r) => `${padName(r.name, w)}📝${ck(r.logHit)} 🥩${ck(r.protHit)} 🍽️${ck(r.calHit)}  🏋️${r.gymStr}`);
+  const lines = rows.map((r) => `${padName(r.name, w)}📝${ck(r.logHit)} 🥩${ck(r.protHit)} 🍽️${ck(r.calHit)} ${r.actSeg}  🏋️${r.gymStr}`);
   return "🌙 *TONIGHT'S SCORE*\n```\n" + lines.join("\n") + "\n```";
 }
 
@@ -108,7 +112,8 @@ function league5(w, needDays) {
   const protPt = w.goalProt && w.avgProt >= w.goalProt ? 1 : 0;
   const calPt = w.goalCal && Math.abs(w.avgCal - w.goalCal) / w.goalCal <= 0.15 ? 1 : 0;
   const gymPt = w.gymGoal && w.gym >= w.gymGoal ? 1 : 0;
-  return { score: logPt + protPt + calPt + gymPt, logPt, protPt, calPt, gymPt };
+  const actPt = actWeek(w).pt;
+  return { score: logPt + protPt + calPt + gymPt + actPt, logPt, protPt, calPt, gymPt, actPt };
 }
 async function weekAll(sql, offset = 0) {
   const daysElapsed = offset === 0 ? daysIntoWeek() : 6;
@@ -119,7 +124,7 @@ async function weekAll(sql, offset = 0) {
 function composeWTD(arr) {
   const rows = [...arr].sort((a, b) => b.score - a.score);
   const w = Math.max(6, ...rows.map((r) => r.name.length)) + 1;
-  const lines = rows.map((r) => `${padName(r.name, w)}📝${r.loggedDays}/${r.daysElapsed} 🥩${ck(r.protPt)} 🍽️${ck(r.calPt)} 🏋️${ck(r.gymPt)}`);
+  const lines = rows.map((r) => `${padName(r.name, w)}📝${r.loggedDays}/${r.daysElapsed} 🥩${ck(r.protPt)} 🍽️${ck(r.calPt)} ${actWeek(r).seg} 🏋️${ck(r.gymPt)}`);
   return "📊 *WEEK SO FAR* · avg/day\n```\n" + lines.join("\n") + "\n```";
 }
 
@@ -145,6 +150,8 @@ function composeCloseGap(rows) {
       else if (dev < -0.05) n.push(`🍽️ nice restraint 👏 room for up to ${r0(clampUp(raw, w.goalCal)).toLocaleString()}cal/day and still on budget`);
     }
     if (w.gymGoal && w.gym === 0 && (w.daysElapsed || 1) >= 4) n.push(`🏋️ no workouts logged yet — forget to enter it, or better get busy to hit your ${w.gymGoal} this week 😤`);
+    if (w.metric === "cardio" && w.cardioGoal && w.cardioTotal < w.cardioGoal) n.push(`🏃 ${r0(w.cardioGoal - w.cardioTotal)} cardio minutes left to hit your weekly ${w.cardioGoal}`);
+    if (w.metric !== "cardio" && w.stepsGoal && w.avgSteps < w.stepsGoal) n.push(`👟 averaging ${stepsShort(w.avgSteps)} steps/day — goal is ${stepsShort(w.stepsGoal)}`);
     const hasGoals = !!(w.goalProt || w.goalCal);
     const body = n.length ? n.map((x) => `  ${x}`).join("\n") : (hasGoals ? "  🎯 on pace — keep it up" : "  set your goals to get nudges");
     return `*${w.name}*\n${body}`;
@@ -270,7 +277,7 @@ async function composeLastWeek(sql) {
   const w = Math.max(6, ...rows.map((r) => r.name.length)) + 1;
   const lines = rows.map((r, i) => {
     const trail = i === 0 && r.score > 0 ? "  👑" : (r.score === 0 ? "  🦗" : "");
-    return `${MEDAL_EMOJI[r.medal]} ${padName(r.name, w)}📝${r.loggedDays}/6 🥩${ck(r.protPt)} 🍽️${ck(r.calPt)} 🏋️${ck(r.gymPt)}${trail}`;
+    return `${MEDAL_EMOJI[r.medal]} ${padName(r.name, w)}📝${r.loggedDays}/6 🥩${ck(r.protPt)} 🍽️${ck(r.calPt)} ${actWeek(r).seg} 🏋️${ck(r.gymPt)}${trail}`;
   });
   return "🏁 *LAST WEEK'S RESULTS* · avg/day\n```\n" + lines.join("\n") + "\n```";
 }
@@ -356,17 +363,22 @@ function dailyLadder(u) {
   return { lvl, moved: last };
 }
 function weekPass(u, ws) {
-  // ws = the week's Tuesday; count Tue..Sun (6 days). Steps/cardio no longer scored.
-  let calSum = 0, calN = 0, protSum = 0, gym = 0;
+  // ws = the week's Tuesday; count Tue..Sun (6 days). Steps/cardio scored again (v33): activity ≥95%.
+  let calSum = 0, calN = 0, protSum = 0, gym = 0, stepSum = 0, stepN = 0, cardioSum = 0;
   for (let date = ws; date <= addDays(ws, 5); date = addDays(date, 1)) {
     const d = u.days.get(date);
     if (d && Number(d.c) > 0) { calSum += Number(d.c); calN++; protSum += Number(d.p); }
     gym += u.gyms.get(date) ?? 0;
+    const st = u.acts.get(date); if (st != null && st > 0) { stepSum += st; stepN++; }
+    cardioSum += u.cards.get(date) ?? 0;
   }
   const calOk = within5(calN ? calSum / calN : 0, u.goals.calorie_goal);
   const protOk = atLeast95(calN ? protSum / calN : 0, u.goals.protein_goal);
   const gymOk = !!u.goals.gym_goal && gym >= u.goals.gym_goal; // gym must be 100%+
-  return calOk && protOk && gymOk;
+  const actOk = u.metric === "cardio"
+    ? (!u.goals.cardio_goal || cardioSum >= u.goals.cardio_goal * 0.95)
+    : (!u.goals.steps_goal || atLeast95(stepN ? stepSum / stepN : 0, u.goals.steps_goal));
+  return calOk && protOk && gymOk && actOk;
 }
 function weeklyLadder(u) {
   let lvl = 5, last = null;
@@ -396,7 +408,7 @@ async function composeLadderWeekly(sql) {
   if (!us.length) return null;
   const rows = us.map((u) => { const r = weeklyLadder(u); const t = ((u.gender || "M").toUpperCase().startsWith("F") ? GOT_F : GOT_M)[r.lvl - 1]; return { name: u.display_name, lvl: r.lvl, title: t, moved: r.moved }; }).sort((a, b) => b.lvl - a.lvl);
   const lines = rows.map((r) => ladderLine(r.name, r.lvl, r.title, r.moved, "week"));
-  return ["🐉 *THE THRONE ROOM · weekly avatar*", ...lines, "_win the week (cals · protein within 5% + gym 100%) to rise from Flea Bottom to the Iron Throne_"].join("\n\n");
+  return ["🐉 *THE THRONE ROOM · weekly avatar*", ...lines, "_win the week (cals · protein within 5% + steps/cardio 95% + gym 100%) to rise from Flea Bottom to the Iron Throne_"].join("\n\n");
 }
 
 async function waSend(payload) {
