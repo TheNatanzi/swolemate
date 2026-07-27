@@ -1,3 +1,6 @@
+// coach v31 (2026-07) — FIX: Tonight's Score gym/cardio week window now = Tue-Sun LA week (curTue). It used
+// Postgres date_trunc('week', current_date), which runs on UTC — after 5pm LA on Sundays that's already NEXT
+// Monday, so gym counts reset to 0 in the Sunday-night message (the last night of the scoring week).
 // coach v30 (2026-07) — SIMPLIFIED: steps/cardio removed from all messages + scoring. Clean monospace grid (```code block```) for Tonight's Score / Week So Far / Last Week. Week = Tue..Sun (6 days), Mon = recap/off. Score now /4 (log+protein+cal+gym). New endpoints: morning=1 -> [Close the Gap, Ladder] (10a Tue-Sun); night=1 -> [Tonight's Score, Week So Far] (10:30p Tue-Sun). Tonight's Score = TODAY (was yesterday). Close the Gap uses LOGGED days only + clamps targets. Steps still collected in DB (re-enable = revert).
 // coach v29 — daily avatar ladder now = LOGGING only (cals within ±30% of goal); weekly throne + Monday medals unchanged.
 // coach v28 — SwoleMate engine. meal checks skip users with no data push in 4h (silent pipe ≠ skipped meals). daily-read stats split onto 2 lines (after cal). meal thresholds 20% @4:30p, 70% @9:30p (+ under-pace flavor). daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
@@ -51,8 +54,8 @@ async function statsForUser(sql, ref = "primary", forDate = null) {
   if (!u) throw new Error(`no user for ref '${ref}'`);
   const days = await sql`select log_date::text, calories, protein_g, food_logged from fitness.v_daily_latest where user_id=${u.id} order by log_date desc limit 40`;
   const act = await sql`select log_date::text, steps from fitness.v_activity_latest where user_id=${u.id} order by log_date desc limit 15`;
-  const [gym] = await sql`select coalesce(sum(sessions),0)::int as n from fitness.v_gym_latest where user_id=${u.id} and log_date >= date_trunc('week', current_date)::date`;
-  const [card] = await sql`select coalesce(sum(minutes),0)::numeric as m from fitness.v_cardio_latest where user_id=${u.id} and log_date >= date_trunc('week', current_date)::date`;
+  const [gym] = await sql`select coalesce(sum(sessions),0)::int as n from fitness.v_gym_latest where user_id=${u.id} and log_date >= ${curTue()}`;
+  const [card] = await sql`select coalesce(sum(minutes),0)::numeric as m from fitness.v_cardio_latest where user_id=${u.id} and log_date >= ${curTue()}`;
   const [goal] = await sql`select calorie_goal, protein_goal, gym_goal, steps_goal, cardio_goal from fitness.v_user_goal_latest where user_id=${u.id}`;
   const dayRow = (forDate ? days.find((d) => d.log_date === forDate) : days[0]) || {};
   const actRow = (forDate ? act.find((a) => a.log_date === forDate) : act[0]) || {};
