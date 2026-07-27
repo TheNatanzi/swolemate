@@ -1,3 +1,4 @@
+// coach v32 (2026-07) — Tonight's Score gym cell always shows n/goal, with ✅ APPENDED when the weekly goal is hit (was: ✅ replaced the numbers).
 // coach v31 (2026-07) — FIX: Tonight's Score gym/cardio week window now = Tue-Sun LA week (curTue). It used
 // Postgres date_trunc('week', current_date), which runs on UTC — after 5pm LA on Sundays that's already NEXT
 // Monday, so gym counts reset to 0 in the Sunday-night message (the last night of the scoring week).
@@ -68,7 +69,7 @@ async function statsForUser(sql, ref = "primary", forDate = null) {
 function scoreRow(s) {
   const ct = calTier(s.cal, s.goalCal);
   const logHit = (s.cal > 0 || s.prot > 0), protHit = !!s.goalProt && s.prot >= s.goalProt, calHit = ct === "on", gymHit = !!s.gymGoal && s.gymSessions >= s.gymGoal;
-  const gymStr = gymHit ? "✅" : (s.gymGoal ? `${s.gymSessions}/${s.gymGoal}` : `${s.gymSessions}`);
+  const gymStr = s.gymGoal ? `${s.gymSessions}/${s.gymGoal}${gymHit ? "✅" : ""}` : `${s.gymSessions}`;
   return { name: s.name, aura: auraOf(s), logHit, protHit, calHit, gymStr };
 }
 async function podRefs(sql) { return (await sql`select cronometer_ref from fitness.app_user where pod_id = (select pod_id from fitness.app_user where cronometer_ref='primary') and cronometer_ref is not null order by created_at`).map((r) => r.cronometer_ref); }
