@@ -1,8 +1,10 @@
-// cron-pull-oura v7 — pulls Oura daily activity + workouts for every connected user (fitness.oura_token).
-// v7: workouts are classified server-side — strength-type -> gym_log sessions, everything else -> cardio_log
-//     minutes — for NON-primary users only. The primary user's gym/cardio come from Cronometer (cron-pull);
-//     writing both sources would race in the v_*_latest views. Steps/workout counts still land in activity_log
-//     for everyone. &dry=1 returns the classification without writing.
+// cron-pull-oura v10 (2026-07) — sessions + enhanced_tags now count as workouts (needs oura-oauth v10 scopes:
+// session tag heartrate). Exercise-looking sessions/tags are classified like workouts (strength -> gym, else -> cardio);
+// non-exercise ones (nap, meditation, mood tags…) are ignored. Items overlapping an existing /workout entry are
+// deduped so the same HIIT doesn't count twice. Duration-less exercise tags default to 30m (name marked with ~).
+// v9: adds ?raw=1 debug: dumps raw /workout + /session + /enhanced_tag (with minutes) per user, no writes.
+// v8: Oura writes gym/cardio ONLY when Cronometer isn't the workout source (primary OR food_only=false skip). Steps land for everyone.
+// v7: workouts classified server-side — strength-type -> gym_log sessions, everything else -> cardio_log minutes (non-primary only).
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 
 const TOKEN = "https://api.ouraring.com/oauth/token";
@@ -14,21 +16,43 @@ function laDate(offsetDays = 0) {
 }
 
 const GYM_RX = /strength|weight|functional|cross[_\s-]?train|resistance|powerlift|bodybuild/i;
-const pretty = (s) => String(s ?? "").replace(/_/g, " ").trim();
-function classifyWorkouts(list) {
-  const byDay = {};
-  for (const w of list) {
+const EXERCISE_RX = /hiit|interval|cardio|run|jog|sprint|cycl|bik(e|ing)|swim|row|walk|hik(e|ing)|elliptical|spin|box|kick|danc|aerobic|sport|soccer|football|basketball|tennis|padel|squash|climb|jump|skat|ski|surf|yoga|pilates|stretch|exercise|workout|train|circuit|bootcamp|core|abs/i;
+const pretty = (s) => String(s ?? "").replace(/^tag_(generic|activity)_/, "").replace(/_/g, " ").trim();
+const spanMin = (a, b) => { const t0 = Date.parse(a), t1 = Date.parse(b); return (Number.isFinite(t0) && Number.isFinite(t1) && t1 > t0) ? Math.round((t1 - t0) / 60000) : null; };
+const wkMin = (w) => spanMin(w.start_datetime, w.end_datetime);
+
+// Normalize workouts + sessions + tags into {day, name, min, start, kind}, dedupe overlaps, bucket per day.
+function classifyItems(workouts, sessions, tags) {
+  const items = [];
+  for (const w of workouts) {
     const day = w.day ?? String(w.start_datetime ?? "").slice(0, 10);
     if (!day) continue;
-    const name = pretty(w.activity || w.label || "workout");
-    let min = 0;
-    const t0 = Date.parse(w.start_datetime), t1 = Date.parse(w.end_datetime);
-    if (Number.isFinite(t0) && Number.isFinite(t1) && t1 > t0) min = Math.round((t1 - t0) / 60000);
-    if (min > 240) continue; // all-day noise
-    const d = (byDay[day] ??= { gymSessions: 0, gymMin: 0, gymNames: [], cardioMin: 0, cardioNames: [], count: 0 });
+    items.push({ day, name: pretty(w.activity || w.label || "workout"), min: wkMin(w) ?? 0, start: Date.parse(w.start_datetime), kind: "workout" });
+  }
+  for (const s of sessions) {
+    const day = s.day ?? String(s.start_datetime ?? "").slice(0, 10);
+    const name = pretty(s.type);
+    if (!day || !(GYM_RX.test(name) || EXERCISE_RX.test(name))) continue; // skip meditation/nap/rest etc.
+    items.push({ day, name, min: spanMin(s.start_datetime, s.end_datetime) ?? 0, start: Date.parse(s.start_datetime), kind: "session" });
+  }
+  for (const t of tags) {
+    const day = t.start_day ?? t.day ?? String(t.start_time ?? "").slice(0, 10);
+    const name = pretty(t.tag_type_code ?? t.comment);
+    if (!day || !(GYM_RX.test(name) || EXERCISE_RX.test(name))) continue; // skip mood/food/etc. tags
+    const min = spanMin(t.start_time, t.end_time);
+    items.push({ day, name: min == null ? `${name}~` : name, min: min ?? 30, start: Date.parse(t.start_time), kind: "tag" });
+  }
+  // Dedupe: drop sessions/tags starting within 45m of a /workout entry the same day (same activity, two records).
+  const wkStarts = items.filter((i) => i.kind === "workout");
+  const deduped = items.filter((i) => i.kind === "workout" ||
+    !wkStarts.some((w) => w.day === i.day && Number.isFinite(i.start) && Number.isFinite(w.start) && Math.abs(w.start - i.start) < 45 * 60000));
+  const byDay = {};
+  for (const i of deduped) {
+    if (i.min > 240) continue; // all-day noise
+    const d = (byDay[i.day] ??= { gymSessions: 0, gymMin: 0, gymNames: [], cardioMin: 0, cardioNames: [], count: 0 });
     d.count++;
-    if (GYM_RX.test(name)) { d.gymSessions++; d.gymMin += min; d.gymNames.push(name); }
-    else { d.cardioMin += min; d.cardioNames.push(`${name} ${min}m`); }
+    if (GYM_RX.test(i.name)) { d.gymSessions++; d.gymMin += i.min; d.gymNames.push(i.name); }
+    else { d.cardioMin += i.min; d.cardioNames.push(`${i.name} ${i.min}m`); }
   }
   return byDay;
 }
@@ -38,12 +62,14 @@ Deno.serve(async (req) => {
   const start = url.searchParams.get("start") ?? laDate(-1);
   const end = url.searchParams.get("end") ?? laDate(0);
   const dryRun = url.searchParams.get("dry") === "1";
+  const raw = url.searchParams.get("raw") === "1";
   const clientId = Deno.env.get("OURA_CLIENT_ID");
   const clientSecret = Deno.env.get("OURA_CLIENT_SECRET");
   const sql = postgres(Deno.env.get("SUPABASE_DB_URL"), { prepare: false });
   try {
-    const users = await sql`select ot.user_id, ot.refresh_token, ot.access_token, ot.expires_at, au.display_name, au.cronometer_ref
-                            from fitness.oura_token ot join fitness.app_user au on au.id = ot.user_id`;
+    const users = await sql`select ot.user_id, ot.refresh_token, ot.access_token, ot.expires_at, au.display_name, au.cronometer_ref, ca.food_only
+                            from fitness.oura_token ot join fitness.app_user au on au.id = ot.user_id
+                            left join fitness.cronometer_account ca on ca.user_id = au.id`;
     const results = [];
     for (const u of users) {
       let access = u.access_token;
@@ -60,10 +86,23 @@ Deno.serve(async (req) => {
         await sql`update fitness.oura_token set access_token = ${tok.access_token}, refresh_token = ${tok.refresh_token}, expires_at = ${expires}, updated_at = now() where user_id = ${u.user_id}`;
       }
       const hdr = { Authorization: `Bearer ${access}` };
-      const act = await (await fetch(`${API}/daily_activity?start_date=${start}&end_date=${end}`, { headers: hdr })).json().catch(() => ({}));
-      const wk = await (await fetch(`${API}/workout?start_date=${start}&end_date=${end}`, { headers: hdr })).json().catch(() => ({}));
-      const byDay = classifyWorkouts(wk.data ?? []);
-      const writeWk = u.cronometer_ref !== "primary"; // primary's gym/cardio come from Cronometer
+      const grab = async (path) => await (await fetch(`${API}/${path}?start_date=${start}&end_date=${end}`, { headers: hdr })).json().catch((e) => ({ err: String(e) }));
+      const wk = await grab("workout");
+      const sess = await grab("session");
+      const tags = await grab("enhanced_tag");
+
+      if (raw) {
+        results.push({ user: u.display_name,
+          workouts: (wk.data ?? []).map((w) => ({ day: w.day, activity: w.activity, label: w.label, source: w.source, intensity: w.intensity, min: wkMin(w), start: w.start_datetime })),
+          sessions: (sess.data ?? []).map((s) => ({ day: s.day, type: s.type, min: spanMin(s.start_datetime, s.end_datetime), start: s.start_datetime })),
+          tags: (tags.data ?? []).map((t) => ({ day: t.start_day ?? t.day, tag: t.tag_type_code ?? t.comment, min: spanMin(t.start_time, t.end_time), start: t.start_time })),
+          errors: { workout: wk.data ? undefined : wk, session: sess.data ? undefined : sess, tag: tags.data ? undefined : tags } });
+        continue;
+      }
+
+      const act = await grab("daily_activity");
+      const byDay = classifyItems(wk.data ?? [], sess.data ?? [], tags.data ?? []);
+      const writeWk = u.cronometer_ref !== "primary" && u.food_only !== false;
       let written = 0, gymRows = 0, cardioRows = 0;
       if (!dryRun) {
         for (const d of act.data ?? []) {
@@ -79,9 +118,9 @@ Deno.serve(async (req) => {
           }
         }
       }
-      results.push({ user: u.display_name, days: written, gym_cardio_days: writeWk ? { gym: gymRows, cardio: cardioRows } : "skipped (primary uses Cronometer)", classified: byDay, debug: (act.data ? undefined : act) });
+      results.push({ user: u.display_name, days: written, gym_cardio_days: writeWk ? { gym: gymRows, cardio: cardioRows } : "skipped (Cronometer is workout source)", classified: byDay });
     }
-    return Response.json({ ok: true, dry: dryRun, range: { start, end }, results });
+    return Response.json({ ok: true, dry: dryRun, raw, range: { start, end }, results });
   } catch (e) {
     return Response.json({ ok: false, error: String(e instanceof Error ? e.message : e) }, { status: 500 });
   } finally {

@@ -1,5 +1,3 @@
-// cron-pull v19 (2026-07) — gym = STRENGTH only. isRealWorkout excludes all-day auto-sync aggregates ("Active Energy", "Daily Activity"); parseGym now also skips cardio-type exercises (they go to cardio, not gym) so treadmill/stairs/etc stop inflating gym sessions.
-// cron-pull v18 — isRealWorkout excludes "Active Energy" (all-day calorie metric).
 // cron-pull v17 — scrapes Cronometer for the squad and writes the tables the coach reads.
 // v17: multi-account. Primary comes from CRONOMETER_EMAIL/PASSWORD env (full pull: food + gym + cardio).
 //      Extra members live in fitness.cronometer_account (user_id, email, password, food_only).
@@ -56,9 +54,8 @@ async function exportCsv(s, generate, start, end) {
 }
 
 function parseDaily(csv) { const out = []; for (const r of rows(csv)) { const date = r["Date"]; if (!date) continue; const calories = parseFloat(r["Energy (kcal)"]) || 0; const protein = parseFloat(r["Protein (g)"]) || 0; out.push({ log_date: date, calories, protein_g: protein, food_logged: calories > 0, raw: r }); } return out; }
-function isRealWorkout(name, minutes) { const n = (name || "").trim(); if (!n) return false; if (/fitbit activity/i.test(n)) return false; if (/active energy|daily activity/i.test(n)) return false; /* all-day auto-sync aggregates, not workouts */ if (/^other\b/i.test(n)) return false; if (/\bwalk/i.test(n)) return false; /* walking = cardio, never a gym session */ if (minutes > 240) return false; return true; }
-// gym = a REAL, non-cardio strength session. Cardio-type exercises are handled by parseCardio, not counted as gym.
-function parseGym(csv) { const byDay = {}; for (const r of rows(csv)) { const day = r["Day"]; const name = r["Exercise"]; const group = r["Group"]; const minutes = parseFloat(r["Minutes"]) || 0; if (!day || !isRealWorkout(name, minutes) || isCardio(name, group, minutes)) continue; (byDay[day] ??= { sessions: 0, minutes: 0, names: [], raw: [] }); byDay[day].sessions++; byDay[day].minutes += minutes; byDay[day].names.push(name); byDay[day].raw.push(r); } return byDay; }
+function isRealWorkout(name, minutes) { const n = (name || "").trim(); if (!n) return false; if (/fitbit activity/i.test(n)) return false; if (/^other\b/i.test(n)) return false; if (/\bwalk/i.test(n)) return false; /* walking = cardio, never a gym session */ if (minutes > 240) return false; return true; }
+function parseGym(csv) { const byDay = {}; for (const r of rows(csv)) { const day = r["Day"]; const name = r["Exercise"]; const minutes = parseFloat(r["Minutes"]) || 0; if (!day || !isRealWorkout(name, minutes)) continue; (byDay[day] ??= { sessions: 0, minutes: 0, names: [], raw: [] }); byDay[day].sessions++; byDay[day].minutes += minutes; byDay[day].names.push(name); byDay[day].raw.push(r); } return byDay; }
 
 // --- Cardio: sum minutes of cardio-type workouts (treadmill/run/bike/row/stair/elliptical/swim/HIIT/etc). ---
 const CARDIO_RE = /(treadmill|running|\brun\b|jog|\bwalk|elliptical|cross[- ]?trainer|arc trainer|stair|stepper|step ?mill|rowing|\brow\b|\berg\b|cycling|\bbike|bicycl|spin(?:ning)?|\bswim|cardio|aerobic|hiit|high intensity interval|jump ?rope|skipping|sprint|conditioning)/i;
@@ -66,7 +63,6 @@ function isCardio(name, group, minutes) {
   const n = (name || "").trim();
   if (!n) return false;
   if (/fitbit activity/i.test(n)) return false;
-  if (/active energy|daily activity/i.test(n)) return false;
   if (minutes > 240) return false; // all-day auto-sync noise
   if (/cardio|aerobic/i.test(group || "")) return true;
   return CARDIO_RE.test(n);
