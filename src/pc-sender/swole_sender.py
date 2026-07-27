@@ -2,7 +2,7 @@
 """swole_sender.py — PC-driven WhatsApp group delivery for SwoleMate (replaces Tasker/AutoInput).
 Fetches composed messages from the coach edge function, then drives the USB-connected Pixel 7a via ADB:
 text via SEND text/plain share intent (emoji-safe), avatar GIFs via SEND image/gif with MediaStore URIs.
-Modes: daily | mealam | mealpm | monday | test
+Modes: morning | night | mealam | mealpm | monday | daily | test
 Scheduled by Windows Task Scheduler (PC is always-on, phone always docked via USB).
 """
 import subprocess, sys, json, re, time, urllib.request, datetime, io, os
@@ -218,8 +218,8 @@ def run(mode):
         log(f"{mode}: no adb device — using BACKUP route (Tasker) for texts, images skipped")
     if mode == "test":
         send_text_resilient("⚙️ pc-sender self-test ✅"); return
-    params = {"daily": "daily=1", "mealam": "meal=am", "mealpm": "meal=pm", "monday": "monday=1"}[mode]
-    if mode in ("mealam", "mealpm"):
+    params = {"daily": "daily=1", "morning": "morning=1", "night": "night=1", "mealam": "meal=am", "mealpm": "meal=pm", "monday": "monday=1"}[mode]
+    if mode in ("mealam", "mealpm", "morning", "night"):
         fresh_pull()
     d = fetch(params)
     if d.get("skipped"): log(f"{mode}: skipped ({d['skipped']})"); return

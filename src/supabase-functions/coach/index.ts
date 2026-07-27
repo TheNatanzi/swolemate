@@ -1,5 +1,6 @@
-// coach v29 — WEEK SO FAR now matches THE DAILY READ: sorted best-first + stats split onto 2 lines (📝🥩🍽️ | activity·🏋️).
-// coach v28 base — SwoleMate engine. meal checks skip users with no data push in 4h (silent pipe ≠ skipped meals). daily-read stats split onto 2 lines (after cal). meal thresholds 20% @4:30p, 70% @9:30p (+ under-pace flavor). daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
+// coach v30 (2026-07) — SIMPLIFIED: steps/cardio removed from all messages + scoring. Clean monospace grid (```code block```) for Tonight's Score / Week So Far / Last Week. Week = Tue..Sun (6 days), Mon = recap/off. Score now /4 (log+protein+cal+gym). New endpoints: morning=1 -> [Close the Gap, Ladder] (10a Tue-Sun); night=1 -> [Tonight's Score, Week So Far] (10:30p Tue-Sun). Tonight's Score = TODAY (was yesterday). Steps still collected in DB (re-enable = revert).
+// coach v29 — daily avatar ladder now = LOGGING only (cals within ±30% of goal); weekly throne + Monday medals unchanged.
+// coach v28 — SwoleMate engine. meal checks skip users with no data push in 4h (silent pipe ≠ skipped meals). daily-read stats split onto 2 lines (after cal). meal thresholds 20% @4:30p, 70% @9:30p (+ under-pace flavor). daily=1 -> [read, week, gap, LADDER]. meal=am|pm -> meal check. monday=1 -> recap+season+THRONE.
 // Ladders: daily streak -> Super Saiyan avatar level; weekly streak -> Game of Thrones level. Start L5 (app_config.ladder_start), ✅=+1 ❌=-1, clamp [1,10].
 // Daily ✅ = cals within ±5% + protein ≥95% + steps ≥95% (cardio users: ≥95% of weekly-goal/7). Weekly ✅ = those on week avgs + gym ≥100%.
 // Delivery: &tasker=1 -> phone AutoRemote -> WhatsApp GROUP (15s between messages). &send=1 -> Meta DMs. &me=1 = primary only.
@@ -13,6 +14,11 @@ const ck = (b) => b ? "✅" : "❌";
 const prevDay = (s) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() - 1); return d.toISOString().slice(0, 10); };
 const laDate = (off = 0) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(new Date(Date.now() + off * 86400000));
 const stepsShort = (n) => { const x = r0(n); return x >= 1000 ? String((x / 1000).toFixed(1)).replace(/\.0$/, "") + "k" : String(x); };
+// --- clean-grid + Tue–Sun week helpers (steps/cardio removed 2026-07; week = Tue..Sun, 6 days; Mon = recap/off) ---
+const padName = (s, w) => { s = String(s); return s.length >= w ? s : s + " ".repeat(w - s.length); };
+const laDow = () => new Date(laDate(0) + "T12:00:00Z").getUTCDay(); // 0=Sun..6=Sat, in Pacific time
+const curTue = () => { const dow = laDow(); const back = dow === 0 ? 5 : dow - 2; return addDays(laDate(0), -back); }; // this week's Tuesday (PT)
+const daysIntoWeek = () => { const dow = laDow(); return dow === 0 ? 6 : Math.max(dow - 1, 1); }; // Tue=1 .. Sun=6
 
 const stepPts = (s, g) => g ? r0(Math.min(s / g, 1) * 100) : 0;
 const cardioPts = (m, g) => g ? r0(Math.min(m / g, 1) * 100) : 0;
@@ -32,7 +38,7 @@ function actDaily(s) {
   const hit = !!s.stepsGoal && s.steps >= s.stepsGoal;
   return { pts: stepPts(s.steps, s.stepsGoal), hit, tier: stepTier(s.steps, s.stepsGoal), seg: `👟${stepsShort(s.steps)}${ck(hit)}` };
 }
-const auraOf = (s) => actDaily(s).pts + protPts(s.prot, s.goalProt) + calPts(s.cal, s.goalCal) + (gymTier(s.gymSessions, s.gymGoal) === "slay" ? 100 : s.gymSessions > 0 ? 50 : 0);
+const auraOf = (s) => protPts(s.prot, s.goalProt) + calPts(s.cal, s.goalCal) + (gymTier(s.gymSessions, s.gymGoal) === "slay" ? 100 : s.gymSessions > 0 ? 50 : 0);
 function verdictLine(s) {
   const gt = gymTier(s.gymSessions, s.gymGoal), at = actDaily(s).tier, pt = protTier(s.prot, s.goalProt), ct = calTier(s.cal, s.goalCal);
   const perfect = gt === "slay" && at === "slay" && ct === "on" && pt === "slay";
@@ -56,27 +62,28 @@ async function statsForUser(sql, ref = "primary", forDate = null) {
   return { ref, name: u.display_name, whatsapp_to: u.whatsapp_to, metric: u.activity_metric || "steps", cal: Number(dayRow.calories ?? 0), prot: Number(dayRow.protein_g ?? 0), steps: Number(actRow.steps ?? 0), cardioWtd: Number(card?.m ?? 0), gymSessions: gym?.n ?? 0, foodStreak, goalCal: goal?.calorie_goal, goalProt: goal?.protein_goal, gymGoal: goal?.gym_goal, stepsGoal: goal?.steps_goal, cardioGoal: goal?.cardio_goal };
 }
 
-function userLine(s) {
+function scoreRow(s) {
   const ct = calTier(s.cal, s.goalCal);
-  const a = actDaily(s);
-  const aura = auraOf(s);
   const logHit = (s.cal > 0 || s.prot > 0), protHit = !!s.goalProt && s.prot >= s.goalProt, calHit = ct === "on", gymHit = !!s.gymGoal && s.gymSessions >= s.gymGoal;
-  const line = `*${s.name}* ✨${aura}\n📝${ck(logHit)} 🥩${r0(s.prot)}g${ck(protHit)} 🍽️${r0(s.cal).toLocaleString()}cal${ck(calHit)}\n${a.seg} · 🏋️${s.gymSessions}${ck(gymHit)}\n_${verdictLine(s)}_`;
-  return { line, aura };
+  const gymStr = gymHit ? "✅" : (s.gymGoal ? `${s.gymSessions}/${s.gymGoal}` : `${s.gymSessions}`);
+  return { name: s.name, aura: auraOf(s), logHit, protHit, calHit, gymStr };
 }
 async function podRefs(sql) { return (await sql`select cronometer_ref from fitness.app_user where pod_id = (select pod_id from fitness.app_user where cronometer_ref='primary') and cronometer_ref is not null order by created_at`).map((r) => r.cronometer_ref); }
 async function composeGroup(sql) {
   const refs = await podRefs(sql); const arr = [];
-  for (const ref of refs) { try { arr.push(await statsForUser(sql, ref, laDate(-1))); } catch { /* skip */ } }
-  const blocks = arr.map(userLine).sort((a, b) => b.aura - a.aura).map((x) => x.line);
-  return ["☀️ *THE DAILY READ · yesterday*", ...blocks].join("\n\n");
+  for (const ref of refs) { try { arr.push(await statsForUser(sql, ref, laDate(0))); } catch { /* skip */ } }
+  const rows = arr.map(scoreRow).sort((a, b) => b.aura - a.aura);
+  const w = Math.max(6, ...rows.map((r) => r.name.length)) + 1;
+  const lines = rows.map((r) => `${padName(r.name, w)}📝${ck(r.logHit)} 🥩${ck(r.protHit)} 🍽️${ck(r.calHit)}  🏋️${r.gymStr}`);
+  return "🌙 *TONIGHT'S SCORE*\n```\n" + lines.join("\n") + "\n```";
 }
 
 async function weekStats(sql, ref, offset = 0) {
   const [u] = await sql`select id, display_name, activity_metric from fitness.app_user where cronometer_ref=${ref} limit 1`;
   if (!u) throw new Error(`no user for ref '${ref}'`);
-  const lo = offset === 0 ? sql`date_trunc('week', current_date)::date` : sql`(date_trunc('week', current_date) - interval '7 days')::date`;
-  const hi = offset === 0 ? sql`(current_date + 1)` : sql`date_trunc('week', current_date)::date`;
+  const wkTue = offset === 0 ? curTue() : addDays(curTue(), -7);
+  const lo = wkTue;
+  const hi = offset === 0 ? addDays(laDate(0), 1) : addDays(curTue(), -1);
   const [dl] = await sql`select coalesce(round(avg(calories) filter (where food_logged)),0)::int a, coalesce(round(avg(protein_g) filter (where food_logged)),0)::int p, count(*) filter (where food_logged)::int d from fitness.v_daily_latest where user_id=${u.id} and log_date >= ${lo} and log_date < ${hi}`;
   const [ac] = await sql`select coalesce(round(avg(steps)),0)::int s from fitness.v_activity_latest where user_id=${u.id} and log_date >= ${lo} and log_date < ${hi} and steps is not null`;
   const [cd] = await sql`select coalesce(sum(minutes),0)::numeric m from fitness.v_cardio_latest where user_id=${u.id} and log_date >= ${lo} and log_date < ${hi}`;
@@ -96,45 +103,45 @@ function league5(w, needDays) {
   const logPt = w.loggedDays >= needDays ? 1 : 0;
   const protPt = w.goalProt && w.avgProt >= w.goalProt ? 1 : 0;
   const calPt = w.goalCal && Math.abs(w.avgCal - w.goalCal) / w.goalCal <= 0.15 ? 1 : 0;
-  const actPt = actWeek(w).pt;
   const gymPt = w.gymGoal && w.gym >= w.gymGoal ? 1 : 0;
-  return { score: logPt + protPt + calPt + actPt + gymPt, logPt, protPt, calPt, actPt, gymPt };
+  return { score: logPt + protPt + calPt + gymPt, logPt, protPt, calPt, gymPt };
 }
 async function weekAll(sql, offset = 0) {
-  const daysElapsed = offset === 0 ? (new Date().getUTCDay() + 6) % 7 + 1 : 7;
+  const daysElapsed = offset === 0 ? daysIntoWeek() : 6;
   const refs = await podRefs(sql); const out = [];
   for (const ref of refs) { try { const w = await weekStats(sql, ref, offset); out.push({ ...w, ...league5(w, daysElapsed), daysElapsed }); } catch { /* skip */ } }
   return out;
 }
 function composeWTD(arr) {
-  const blocks = [...arr].sort((a, b) => b.score - a.score).map((w) => `*${w.name}*  (${w.score}/5)\n📝${w.loggedDays}/${w.daysElapsed}${ck(w.logPt)} 🥩${w.avgProt}g${ck(w.protPt)} 🍽️${w.avgCal.toLocaleString()}cal${ck(w.calPt)}\n${actWeek(w).seg} · 🏋️${w.gym}${ck(w.gymPt)}`);
-  return ["📊 *WEEK SO FAR* · avg/day", ...blocks].join("\n\n");
+  const rows = [...arr].sort((a, b) => b.score - a.score);
+  const w = Math.max(6, ...rows.map((r) => r.name.length)) + 1;
+  const lines = rows.map((r) => `${padName(r.name, w)}📝${r.loggedDays}/${r.daysElapsed} 🥩${ck(r.protPt)} 🍽️${ck(r.calPt)} 🏋️${ck(r.gymPt)}`);
+  return "📊 *WEEK SO FAR* · avg/day\n```\n" + lines.join("\n") + "\n```";
 }
 
 function composeCloseGap(rows) {
+  // Only LOGGED days count: avgCal/avgProt already exclude un-logged days; base the make-up on loggedDays,
+  // and clamp targets to a sane band (0.5x..1.5x goal) so the last day never spits out absurd numbers.
   const blocks = rows.map((w) => {
-    const elapsed = w.daysElapsed || 1;
-    const done = Math.max(elapsed - 1, 0);
-    const left = Math.max(8 - elapsed, 1);
+    const logged = w.loggedDays || 0;
+    const left = Math.max(6 - logged, 1);            // remaining days that can still be logged this week
+    const clampUp = (v, goal) => Math.min(v, goal * 1.5);
+    const clampDn = (v, goal) => Math.max(v, goal * 0.5);
     const n = [];
-    if (w.metric === "cardio") {
-      if (w.cardioGoal) { const rem = w.cardioGoal - w.cardioTotal; if (rem > 0) n.push(`🏃 ${r0(rem)} more cardio min this week (~${r0(rem / left)}/day)`); }
-    } else if (w.stepsGoal) {
-      const need = (w.stepsGoal * 7 - w.avgSteps * done) / left;
-      if (need > w.stepsGoal + 50) n.push(`👟 walk ${stepsShort(need)}/day the rest of the week`);
+    if (w.goalProt && logged > 0) {
+      const need = clampUp((w.goalProt * 6 - w.avgProt * logged) / left, w.goalProt);
+      if (need > w.goalProt + 1) n.push(`🥩 ${r0(need)}g protein/day to catch up`);
     }
-    if (w.goalProt) { const need = (w.goalProt * 7 - w.avgProt * done) / left; if (need > w.goalProt + 1) n.push(`🥩 ${r0(need)}g protein/day to catch up`); }
-    if (w.goalCal && done > 0) {
-      const need = (w.goalCal * 7 - w.avgCal * done) / left;
+    if (w.goalCal && logged > 0) {
+      const raw = (w.goalCal * 6 - w.avgCal * logged) / left;
       const dev = (w.avgCal - w.goalCal) / w.goalCal;
-      const cd = r0(need).toLocaleString();
-      if (dev > 0.20) n.push(need < 0 ? `🍽️ blew the weekly budget — damage control the rest of the week 😬` : `🍽️ big surplus — reel it in to ${cd}cal/day to get back on budget`);
-      else if (dev > 0.05) n.push(`🍽️ ease up — average ${cd}cal/day to land on budget`);
-      else if (dev < -0.20) n.push(`🍽️ don't starve yourself 🍗 you can eat up to ${cd}cal/day — muscles need fuel`);
-      else if (dev < -0.05) n.push(`🍽️ nice restraint 👏 room for up to ${cd}cal/day and still on budget`);
+      if (dev > 0.20) n.push(raw < 0 ? `🍽️ blew the weekly budget — damage control the rest of the week 😬` : `🍽️ big surplus — reel it in to ${r0(clampDn(raw, w.goalCal)).toLocaleString()}cal/day to get back on budget`);
+      else if (dev > 0.05) n.push(`🍽️ ease up — average ${r0(clampDn(raw, w.goalCal)).toLocaleString()}cal/day to land on budget`);
+      else if (dev < -0.20) n.push(`🍽️ don't starve yourself 🍗 you can eat up to ${r0(clampUp(raw, w.goalCal)).toLocaleString()}cal/day — muscles need fuel`);
+      else if (dev < -0.05) n.push(`🍽️ nice restraint 👏 room for up to ${r0(clampUp(raw, w.goalCal)).toLocaleString()}cal/day and still on budget`);
     }
-    if (w.gymGoal && w.gym === 0 && elapsed >= 4) n.push(`🏋️ no workouts logged yet — forget to enter it, or better get busy to hit your ${w.gymGoal} this week 😤`);
-    const hasGoals = !!(w.goalProt || w.goalCal || w.stepsGoal || w.cardioGoal);
+    if (w.gymGoal && w.gym === 0 && (w.daysElapsed || 1) >= 4) n.push(`🏋️ no workouts logged yet — forget to enter it, or better get busy to hit your ${w.gymGoal} this week 😤`);
+    const hasGoals = !!(w.goalProt || w.goalCal);
     const body = n.length ? n.map((x) => `  ${x}`).join("\n") : (hasGoals ? "  🎯 on pace — keep it up" : "  set your goals to get nudges");
     return `*${w.name}*\n${body}`;
   });
@@ -256,12 +263,12 @@ async function finalizeWeek(sql) {
 }
 async function composeLastWeek(sql) {
   const { rows } = await finalizeWeek(sql);
-  const blocks = rows.map((r, i) => {
-    const tag = i === 0 && r.score > 0 ? " — 👑 Bragging Rights of the Week" : (r.score === 0 ? " — crickets 🦗" : "");
-    const detail = `🥩${r.avgProt}g${ck(r.protPt)} 🍽️${r.avgCal.toLocaleString()}cal${ck(r.calPt)} ${actWeek(r).seg} · 🏋️${r.gym}${ck(r.gymPt)} · 📝${r.loggedDays}/7${ck(r.logPt)}`;
-    return `${MEDAL_EMOJI[r.medal]} *${r.name}* ${r.score}/5${tag}\n${detail}`;
+  const w = Math.max(6, ...rows.map((r) => r.name.length)) + 1;
+  const lines = rows.map((r, i) => {
+    const trail = i === 0 && r.score > 0 ? "  👑" : (r.score === 0 ? "  🦗" : "");
+    return `${MEDAL_EMOJI[r.medal]} ${padName(r.name, w)}📝${r.loggedDays}/6 🥩${ck(r.protPt)} 🍽️${ck(r.calPt)} 🏋️${ck(r.gymPt)}${trail}`;
   });
-  return ["🏁 *LAST WEEK'S RESULTS* · avg/day", ...blocks].join("\n\n");
+  return "🏁 *LAST WEEK'S RESULTS* · avg/day\n```\n" + lines.join("\n") + "\n```";
 }
 async function seasonMeta(sql) {
   const [m] = await sql`select gc.pod_id, gc.season_weeks, gc.season_start, (floor((current_date - gc.season_start)/7) + 1)::int as week_num, (floor(((date_trunc('week', current_date) - interval '7 days')::date - gc.season_start)/7) + 1)::int as prev_week_num from fitness.game_config gc where gc.pod_id = (select pod_id from fitness.app_user where cronometer_ref='primary')`;
@@ -307,8 +314,10 @@ const GOT_M = ["Flea Bottom Peasant", "Gutter Urchin", "Tavern Servant", "Conscr
 const GOT_F = ["Flea Bottom Peasant", "Gutter Urchin", "Tavern Servant", "Conscript Spearwoman", "Sellsword", "Anointed Knight", "Landed Lady", "Warden of the Realm", "Crowned Queen", "TARGARYEN DRAGON QUEEN"];
 const addDays = (s, n) => { const d = new Date(s + "T12:00:00Z"); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
 const mondayOnOrAfter = (s) => { const d = new Date(s + "T12:00:00Z"); const off = (8 - d.getUTCDay()) % 7; return addDays(s, off); };
+const tuesdayOnOrAfter = (s) => { const d = new Date(s + "T12:00:00Z"); const off = (9 - d.getUTCDay()) % 7; return addDays(s, off); };
 const within5 = (v, goal) => !!goal && goal > 0 && Math.abs(v - goal) / goal <= 0.05;
 const atLeast95 = (v, goal) => !!goal && goal > 0 && v >= goal * 0.95;
+const within30 = (v, goal) => !!goal && goal > 0 && Math.abs(v - goal) / goal <= 0.30;
 
 async function ladderData(sql) {
   const [ls] = await sql`select value from fitness.app_config where key='ladder_start' limit 1`;
@@ -329,11 +338,9 @@ async function ladderData(sql) {
   return out;
 }
 function dayPass(u, date) {
+  // Daily ladder = logging only: day counts if calories logged land within ±30% of goal.
   const d = u.days.get(date);
-  const calOk = within5(Number(d?.c ?? 0), u.goals.calorie_goal);
-  const protOk = atLeast95(Number(d?.p ?? 0), u.goals.protein_goal);
-  const actOk = u.metric === "cardio" ? atLeast95(u.cards.get(date) ?? 0, (u.goals.cardio_goal || 0) / 7) : atLeast95(u.acts.get(date) ?? 0, u.goals.steps_goal);
-  return calOk && protOk && actOk;
+  return within30(Number(d?.c ?? 0), u.goals.calorie_goal);
 }
 function dailyLadder(u) {
   let lvl = 5, last = null;
@@ -345,23 +352,22 @@ function dailyLadder(u) {
   return { lvl, moved: last };
 }
 function weekPass(u, ws) {
-  let calSum = 0, calN = 0, protSum = 0, stepSum = 0, stepN = 0, cardio = 0, gym = 0;
-  for (let date = ws; date <= addDays(ws, 6); date = addDays(date, 1)) {
+  // ws = the week's Tuesday; count Tue..Sun (6 days). Steps/cardio no longer scored.
+  let calSum = 0, calN = 0, protSum = 0, gym = 0;
+  for (let date = ws; date <= addDays(ws, 5); date = addDays(date, 1)) {
     const d = u.days.get(date);
     if (d && Number(d.c) > 0) { calSum += Number(d.c); calN++; protSum += Number(d.p); }
-    const s = u.acts.get(date); if (s != null) { stepSum += s; stepN++; }
-    cardio += u.cards.get(date) ?? 0; gym += u.gyms.get(date) ?? 0;
+    gym += u.gyms.get(date) ?? 0;
   }
   const calOk = within5(calN ? calSum / calN : 0, u.goals.calorie_goal);
   const protOk = atLeast95(calN ? protSum / calN : 0, u.goals.protein_goal);
-  const actOk = u.metric === "cardio" ? atLeast95(cardio, u.goals.cardio_goal) : atLeast95(stepN ? stepSum / stepN : 0, u.goals.steps_goal);
   const gymOk = !!u.goals.gym_goal && gym >= u.goals.gym_goal; // gym must be 100%+
-  return calOk && protOk && actOk && gymOk;
+  return calOk && protOk && gymOk;
 }
 function weeklyLadder(u) {
   let lvl = 5, last = null;
   const today = laDate(0);
-  for (let ws = mondayOnOrAfter(u.start); addDays(ws, 7) <= today; ws = addDays(ws, 7)) {
+  for (let ws = tuesdayOnOrAfter(u.start); addDays(ws, 6) <= today; ws = addDays(ws, 7)) {
     last = weekPass(u, ws);
     lvl = Math.max(1, Math.min(10, lvl + (last ? 1 : -1)));
   }
@@ -379,14 +385,14 @@ async function composeLadderDaily(sql) {
   if (!us.length) return null;
   const rows = us.map((u) => { const r = dailyLadder(u); return { name: u.display_name, ...r }; }).sort((a, b) => b.lvl - a.lvl);
   const lines = rows.map((r) => ladderLine(r.name, r.lvl, SS_TIERS[r.lvl - 1], r.moved));
-  return ["⚡ *THE LADDER · daily avatar*", ...lines, "_hit your day (cals · protein · steps, all within 5%) = climb. miss = sink. L1 Jabba the Hutt ⇄ L10 SUPER SAIYAN_"].join("\n\n");
+  return ["⚡ *THE LADDER · daily avatar*", ...lines, "_log your day (cals within 30% of goal) = climb. no log = sink. L1 Jabba the Hutt ⇄ L10 SUPER SAIYAN_"].join("\n\n");
 }
 async function composeLadderWeekly(sql) {
   const us = await ladderData(sql);
   if (!us.length) return null;
   const rows = us.map((u) => { const r = weeklyLadder(u); const t = ((u.gender || "M").toUpperCase().startsWith("F") ? GOT_F : GOT_M)[r.lvl - 1]; return { name: u.display_name, lvl: r.lvl, title: t, moved: r.moved }; }).sort((a, b) => b.lvl - a.lvl);
   const lines = rows.map((r) => ladderLine(r.name, r.lvl, r.title, r.moved, "week"));
-  return ["🐉 *THE THRONE ROOM · weekly avatar*", ...lines, "_win the week (cals · protein · steps within 5% + gym 100%) to rise from Flea Bottom to the Iron Throne_"].join("\n\n");
+  return ["🐉 *THE THRONE ROOM · weekly avatar*", ...lines, "_win the week (cals · protein within 5% + gym 100%) to rise from Flea Bottom to the Iron Throne_"].join("\n\n");
 }
 
 async function waSend(payload) {
@@ -428,6 +434,8 @@ Deno.serve(async (req) => {
     }
     if (q.get("meal")) { const msg = await composeMealCheck(sql, q.get("meal") === "pm" ? "pm" : "am"); if (!msg) return Response.json({ ok: true, skipped: "everyone logged" }); return Response.json(await out(msg)); }
     if (q.get("daily") === "1") { const wk = await weekAll(sql, 0); return Response.json(await out([await composeGroup(sql), composeWTD(wk), composeCloseGap(wk), await composeLadderDaily(sql)])); }
+    if (q.get("morning") === "1") { const wk = await weekAll(sql, 0); return Response.json(await out([composeCloseGap(wk), await composeLadderDaily(sql)])); }
+    if (q.get("night") === "1") { return Response.json(await out([await composeGroup(sql), composeWTD(await weekAll(sql, 0))])); }
     if (q.get("group") === "1") return Response.json(await out(await composeGroup(sql)));
     if (q.get("wtd") === "1") return Response.json(await out(composeWTD(await weekAll(sql, 0))));
     if (q.get("gap") === "1") return Response.json(await out(composeCloseGap(await weekAll(sql, 0))));
@@ -446,7 +454,7 @@ Deno.serve(async (req) => {
       msgs.push(await composeLadderWeekly(sql));
       return Response.json(await out(msgs));
     }
-    return Response.json({ ok: true, modes: ["daily", "meal=am|pm", "group", "wtd", "gap", "ladder", "throne", "monday"], hint: "&tasker=1 -> group via phone" });
+    return Response.json({ ok: true, modes: ["morning", "night", "daily", "meal=am|pm", "group", "wtd", "gap", "ladder", "throne", "monday"], hint: "&tasker=1 -> group via phone" });
   } catch (e) {
     return Response.json({ ok: false, error: String(e instanceof Error ? e.message : e) }, { status: 500 });
   } finally { try { await sql.end(); } catch { /* ignore */ } }
