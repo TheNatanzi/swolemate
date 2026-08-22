@@ -1,10 +1,19 @@
-// cron-pull-oura v10 (2026-07) — sessions + enhanced_tags now count as workouts (needs oura-oauth v10 scopes:
-// session tag heartrate). Exercise-looking sessions/tags are classified like workouts (strength -> gym, else -> cardio);
-// non-exercise ones (nap, meditation, mood tags…) are ignored. Items overlapping an existing /workout entry are
-// deduped so the same HIIT doesn't count twice. Duration-less exercise tags default to 30m (name marked with ~).
-// v9: adds ?raw=1 debug: dumps raw /workout + /session + /enhanced_tag (with minutes) per user, no writes.
-// v8: Oura writes gym/cardio ONLY when Cronometer isn't the workout source (primary OR food_only=false skip). Steps land for everyone.
-// v7: workouts classified server-side — strength-type -> gym_log sessions, everything else -> cardio_log minutes (non-primary only).
+// cron-pull-oura v14 (2026-08-22) — PRIMARY ACCOUNT (Medi) NOW ALSO GETS OURA WORKOUTS. His phone's
+// Health Connect degraded to walk-only labels ~2026-08-01, so Cronometer stopped feeding his gym; his
+// real sessions (crossTraining etc.) live in Oura. Dropped the `cronometer_ref !== "primary"` gate from
+// writeWk so Oura is his workout source. Only Medi is "primary", so no other member's behavior changes.
+// cron-pull-oura v13 (2026-07-30) — GYM SESSION MINIMUM = 18 MINUTES, matching cron-pull v22: a
+// strength-type item shorter than 18m is a stub/fumble and is ignored (not gym, not cardio).
+// cron-pull-oura v12 (2026-07) — DEFAULT END DATE IS NOW TOMORROW. Oura's daily endpoints treat
+// end_date as exclusive for the current day: with end=today, TODAY's daily_activity doc is never
+// returned, so nobody had same-day steps (proven 2026-07-29). Asking for tomorrow is harmless.
+// cron-pull-oura v11 (2026-07) — GYM_RX aligned with cron-pull v21: HIIT / interval / circuit /
+// bootcamp / conditioning / pilates / kettlebell now classify as GYM, not cardio.
+// v10: sessions + enhanced_tags count as workouts (needs oura-oauth v10 scopes: session tag heartrate).
+// Items overlapping an existing /workout entry are deduped. Duration-less exercise tags default to 30m.
+// NOTE: tokens issued before oura-oauth v10 lack the session+tag scopes — those members must re-authorize.
+// v9: ?raw=1 debug dump per user, no writes.
+// v8: Oura writes gym/cardio ONLY when Cronometer isn't the workout source. Steps land for everyone.
 import postgres from "https://deno.land/x/postgresjs@v3.4.5/mod.js";
 
 const TOKEN = "https://api.ouraring.com/oauth/token";
@@ -15,7 +24,9 @@ function laDate(offsetDays = 0) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(d);
 }
 
-const GYM_RX = /strength|weight|functional|cross[_\s-]?train|resistance|powerlift|bodybuild/i;
+// Kept in step with cron-pull's GYM_RE. A high-intensity class is a gym session, not cardio.
+const GYM_RX = /strength|weight|functional|cross[_\s-]?train|cross ?fit|resistance|powerlift|bodybuild|hiit|high[_\s-]?intensity|interval|circuit|boot ?camp|conditioning|pilates|calisthen|kettlebell/i;
+const GYM_MIN_MINUTES = 18; // v13: same stub rule as cron-pull v22 — keep identical
 const EXERCISE_RX = /hiit|interval|cardio|run|jog|sprint|cycl|bik(e|ing)|swim|row|walk|hik(e|ing)|elliptical|spin|box|kick|danc|aerobic|sport|soccer|football|basketball|tennis|padel|squash|climb|jump|skat|ski|surf|yoga|pilates|stretch|exercise|workout|train|circuit|bootcamp|core|abs/i;
 const pretty = (s) => String(s ?? "").replace(/^tag_(generic|activity)_/, "").replace(/_/g, " ").trim();
 const spanMin = (a, b) => { const t0 = Date.parse(a), t1 = Date.parse(b); return (Number.isFinite(t0) && Number.isFinite(t1) && t1 > t0) ? Math.round((t1 - t0) / 60000) : null; };
@@ -50,9 +61,14 @@ function classifyItems(workouts, sessions, tags) {
   for (const i of deduped) {
     if (i.min > 240) continue; // all-day noise
     const d = (byDay[i.day] ??= { gymSessions: 0, gymMin: 0, gymNames: [], cardioMin: 0, cardioNames: [], count: 0 });
-    d.count++;
-    if (GYM_RX.test(i.name)) { d.gymSessions++; d.gymMin += i.min; d.gymNames.push(i.name); }
-    else { d.cardioMin += i.min; d.cardioNames.push(`${i.name} ${i.min}m`); }
+    if (GYM_RX.test(i.name)) {
+      if (i.min < GYM_MIN_MINUTES) continue; // stub — not a session, not cardio
+      d.count++;
+      d.gymSessions++; d.gymMin += i.min; d.gymNames.push(i.name);
+    } else {
+      d.count++;
+      d.cardioMin += i.min; d.cardioNames.push(`${i.name} ${i.min}m`);
+    }
   }
   return byDay;
 }
@@ -60,7 +76,7 @@ function classifyItems(workouts, sessions, tags) {
 Deno.serve(async (req) => {
   const url = new URL(req.url);
   const start = url.searchParams.get("start") ?? laDate(-1);
-  const end = url.searchParams.get("end") ?? laDate(0);
+  const end = url.searchParams.get("end") ?? laDate(1);
   const dryRun = url.searchParams.get("dry") === "1";
   const raw = url.searchParams.get("raw") === "1";
   const clientId = Deno.env.get("OURA_CLIENT_ID");
@@ -102,7 +118,7 @@ Deno.serve(async (req) => {
 
       const act = await grab("daily_activity");
       const byDay = classifyItems(wk.data ?? [], sess.data ?? [], tags.data ?? []);
-      const writeWk = u.cronometer_ref !== "primary" && u.food_only !== false;
+      const writeWk = u.food_only !== false; // v14: dropped the `cronometer_ref !== "primary"` gate — Medi (primary) now gets Oura workouts too
       let written = 0, gymRows = 0, cardioRows = 0;
       if (!dryRun) {
         for (const d of act.data ?? []) {
